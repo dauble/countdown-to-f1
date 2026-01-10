@@ -131,7 +131,7 @@ PORT=3001 npm run dev
 ## 🆘 Need Help?
 
 - 📖 Read the full [README.md](README.md)
-- 🐛 [Report an issue](https://github.com/yourusername/yoto-f1-card/issues)
+- 🐛 [Report an issue](issues)
 - 💬 Join [Yoto Discord](https://discord.gg/FkwBpYf2CN)
 
 Happy racing! 🏎️💨
