@@ -1,8 +1,8 @@
 import "./globals.css";
 
 export const metadata = {
-  title: "Yoto Weather Card Generator",
-  description: "Create Yoto cards with weather information",
+  title: "Yoto Formula 1 Card Generator",
+  description: "Create Yoto cards with Formula 1 information",
 };
 
 export default function RootLayout({ children }) {
