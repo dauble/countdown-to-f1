@@ -26,6 +26,9 @@ yarn-error.log*
 .env
 .env*.local
 
+# configstore (contains tokens and card IDs)
+.config
+
 # vercel
 .vercel
 

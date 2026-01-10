@@ -136,6 +136,17 @@
   color: #333;
 }
 
+.updateBadge {
+  display: inline-block;
+  padding: 0.5rem 1rem;
+  background: #4caf50;
+  color: white;
+  border-radius: 20px;
+  font-size: 0.9rem;
+  font-weight: 600;
+  margin-bottom: 1rem;
+}
+
 .statusNote {
   margin-top: 1rem;
   padding: 0.75rem;

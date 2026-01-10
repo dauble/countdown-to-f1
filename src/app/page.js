@@ -75,10 +75,15 @@ export default function Home() {
             {result.yoto && (
               <div className={styles.yotoStatus}>
                 <h3>📱 Yoto Card Status</h3>
+                {result.isUpdate && (
+                  <p className={styles.updateBadge}>🔄 Updated Existing Card</p>
+                )}
                 <p><strong>Job ID:</strong> {result.yoto.jobId}</p>
                 <p><strong>Status:</strong> {result.yoto.status}</p>
                 <p className={styles.statusNote}>
-                  The card is being processed and will appear in your Yoto library shortly.
+                  {result.isUpdate 
+                    ? "Your existing card is being updated with the latest race information. The changes will appear in your Yoto library shortly."
+                    : "The card is being processed and will appear in your Yoto library shortly. Future updates will automatically refresh this same card!"}
                 </p>
               </div>
             )}

@@ -1,11 +1,27 @@
 {
   "name": "yoto-f1-card",
-  "version": "0.1.0",
-  "private": true,
+  "version": "1.0.0",
+  "description": "A Next.js app that creates and updates Yoto MYO cards with Formula 1 race information",
+  "author": "yoto-f1-card maintainers",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/example/yoto-f1-card.git"
+  },
+  "keywords": [
+    "yoto",
+    "formula1",
+    "f1",
+    "myo",
+    "tts",
+    "nextjs"
+  ],
+  "private": false,
   "scripts": {
     "dev": "next dev",
     "build": "next build",
-    "start": "next start"
+    "start": "next start",
+    "lint": "next lint"
   },
   "dependencies": {
     "configstore": "^7.0.0",

@@ -17,6 +17,20 @@ function getAccessToken() {
 }
 
 /**
+ * Get stored card ID for updates
+ */
+function getStoredCardId() {
+  return config.get("f1CardId");
+}
+
+/**
+ * Store card ID for future updates
+ */
+function storeCardId(cardId) {
+  config.set("f1CardId", cardId);
+}
+
+/**
  * Get user's timezone from IP address
  */
 async function getUserTimezone(request) {
@@ -61,6 +75,10 @@ export async function POST(request) {
       );
     }
 
+    // Parse request body to check for update preference
+    const body = await request.json().catch(() => ({}));
+    const shouldUpdate = body.updateExisting !== false; // Default to true
+
     // Step 2: Get user's timezone
     const userTimezone = await getUserTimezone(request);
     
@@ -95,15 +113,24 @@ export async function POST(request) {
     // Step 6: Build chapters for Yoto playlist
     const chapters = buildF1Chapters(raceData);
 
-    // Step 7: Create the Yoto card with TTS
-    const title = `F1: ${raceData.name} ${raceData.year}`;
+    // Step 7: Check if we should update existing card
+    const existingCardId = shouldUpdate ? getStoredCardId() : null;
+    
+    // Step 8: Create or update the Yoto card with TTS
+    const title = `F1: Next Race`;
     const yotoResult = await createTextToSpeechPlaylist({
       title,
       chapters,
       accessToken,
+      cardId: existingCardId,
     });
 
-    // Step 8: Return success with job information
+    // Store the card ID if it's a new card
+    if (yotoResult.cardId && !existingCardId) {
+      storeCardId(yotoResult.cardId);
+    }
+
+    // Step 9: Return success with job information
     return Response.json({
       success: true,
       race: raceData,
@@ -111,7 +138,10 @@ export async function POST(request) {
       teams: teamStandings,
       script,
       yoto: yotoResult,
-      message: "Formula 1 card created successfully! Check your Yoto library.",
+      isUpdate: !!existingCardId,
+      message: existingCardId 
+        ? "Formula 1 card updated successfully! Changes will appear in your Yoto library shortly."
+        : "Formula 1 card created successfully! Check your Yoto library.",
     });
 
   } catch (error) {

@@ -99,6 +99,7 @@ export async function createTextToSpeechPlaylist({
     
     return {
       jobId: job.jobId,
+      cardId: job.cardId || cardId, // Return cardId for storage
       status: job.status,
       progress: job.progress,
       message: cardId 
