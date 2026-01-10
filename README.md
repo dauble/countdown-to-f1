@@ -25,7 +25,7 @@ A Next.js application that automatically creates and updates Yoto MYO (Make Your
 1. **Clone the repository**
 
    ```bash
-   git clone https://github.com/yourusername/yoto-f1-card.git
+   git clone https://github.com/<your-github-username>/yoto-f1-card.git
    cd yoto-f1-card
    ```
 
