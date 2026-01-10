@@ -44,7 +44,7 @@ Enhancement suggestions are tracked as GitHub issues. When creating an enhanceme
 1. **Fork and clone the repository**
 
    ```bash
-   git clone https://github.com/your-username/yoto-f1-card.git
+   git clone https://github.com/yoto-f1-card-generator/yoto-f1-card.git
    cd yoto-f1-card
    ```
 
