@@ -2,7 +2,7 @@
   "name": "yoto-f1-card",
   "version": "1.0.0",
   "description": "A Next.js app that creates and updates Yoto MYO cards with Formula 1 race information",
-  "author": "Your Name <your.email@example.com>",
+  "author": "yoto-f1-card maintainers",
   "license": "MIT",
   "repository": {
     "type": "git",
