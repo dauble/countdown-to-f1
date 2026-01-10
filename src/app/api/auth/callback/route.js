@@ -1,7 +1,7 @@
 // Yoto OAuth Callback
 import Configstore from "configstore";
 
-const config = new Configstore("yoto-weather-card-tokens");
+const config = new Configstore("yoto-f1-card-tokens");
 
 export async function GET(request) {
   const { searchParams } = new URL(request.url);

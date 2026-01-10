@@ -136,6 +136,115 @@
   font-size: 1.1rem;
 }
 
+.f1Info {
+  background: white;
+  padding: 1.5rem;
+  border-radius: 8px;
+  margin-bottom: 1rem;
+}
+
+.f1Info h3 {
+  color: #e10600;
+  margin-top: 1.5rem;
+  margin-bottom: 1rem;
+  font-size: 1.3rem;
+}
+
+.f1Info h3:first-child {
+  margin-top: 0;
+}
+
+.raceInfo {
+  background: #f8f8f8;
+  padding: 1rem;
+  border-radius: 6px;
+  border-left: 4px solid #e10600;
+}
+
+.raceInfo p {
+  margin: 0.5rem 0;
+  color: #333;
+  font-size: 1rem;
+}
+
+.raceInfo strong {
+  color: #e10600;
+  font-weight: 600;
+}
+
+.standings {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.standingItem {
+  display: grid;
+  grid-template-columns: 40px 2fr 2fr 100px;
+  gap: 1rem;
+  align-items: center;
+  padding: 0.75rem;
+  background: #f8f8f8;
+  border-radius: 6px;
+  transition: background 0.2s ease;
+}
+
+.standingItem:hover {
+  background: #f0f0f0;
+}
+
+.position {
+  font-weight: bold;
+  font-size: 1.2rem;
+  color: #e10600;
+  text-align: center;
+  background: white;
+  border-radius: 4px;
+  padding: 0.25rem;
+}
+
+.name {
+  font-weight: 600;
+  color: #333;
+}
+
+.team {
+  color: #666;
+  font-size: 0.9rem;
+}
+
+.teamName {
+  font-weight: 600;
+  color: #333;
+  grid-column: span 2;
+}
+
+.points {
+  text-align: right;
+  font-weight: 600;
+  color: #e10600;
+}
+
+.chapters {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  margin-top: 1rem;
+}
+
+.chapter {
+  background: white;
+  padding: 1rem;
+  border-radius: 8px;
+  border-left: 4px solid #e10600;
+}
+
+.chapter h4 {
+  color: #e10600;
+  margin-top: 0;
+  margin-bottom: 0.5rem;
+}
+
 .scriptPreview {
   margin-top: 1rem;
 }
@@ -188,5 +297,15 @@
 
   .main h1 {
     font-size: 2rem;
+  }
+
+  .standingItem {
+    grid-template-columns: 30px 1fr 80px;
+    gap: 0.5rem;
+    font-size: 0.9rem;
+  }
+
+  .team {
+    display: none;
   }
 }

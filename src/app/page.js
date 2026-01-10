@@ -3,7 +3,6 @@ import { useState } from "react";
 import styles from "./page.module.css";
 
 export default function Home() {
-  const [location, setLocation] = useState("");
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState(null);
   const [error, setError] = useState(null);
@@ -18,7 +17,7 @@ export default function Home() {
       const response = await fetch("/api/generate-card", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ location }),
+        body: JSON.stringify({}),
       });
 
       const data = await response.json();
@@ -38,9 +37,9 @@ export default function Home() {
   return (
     <div className={styles.page}>
       <main className={styles.main}>
-        <h1>🎵 Yoto Weather Card</h1>
+        <h1>🏎️ Yoto Formula 1 Card</h1>
         <p className={styles.description}>
-          Generate custom Yoto cards with real-time weather information
+          Generate custom Yoto cards with the latest Formula 1 information
         </p>
 
         <div className={styles.authSection}>
@@ -50,20 +49,12 @@ export default function Home() {
         </div>
 
         <form onSubmit={handleGenerateCard} className={styles.form}>
-          <input
-            type="text"
-            placeholder="Enter location (e.g., London, Paris, Tokyo)"
-            value={location}
-            onChange={(e) => setLocation(e.target.value)}
-            className={styles.input}
-            required
-          />
           <button
             type="submit"
             disabled={loading}
             className={styles.button}
           >
-            {loading ? "Generating..." : "Generate Weather Card"}
+            {loading ? "Generating..." : "Generate F1 Card"}
           </button>
         </form>
 
@@ -77,17 +68,56 @@ export default function Home() {
           <div className={styles.success}>
             <h2>✅ {result.message}</h2>
             
-            <div className={styles.weatherInfo}>
-              <h3>📍 {result.weather.location}</h3>
-              <p>🌡️ Temperature: {result.weather.temperature}°C</p>
-              <p>☁️ Conditions: {result.weather.description}</p>
-              <p>💧 Humidity: {result.weather.humidity}%</p>
-              <p>💨 Wind Speed: {result.weather.windSpeed} m/s</p>
+            <div className={styles.f1Info}>
+              <h3>🏁 Next Race</h3>
+              <div className={styles.raceInfo}>
+                <p><strong>Race:</strong> {result.race.name}</p>
+                <p><strong>Location:</strong> {result.race.location}</p>
+                <p><strong>Circuit:</strong> {result.race.circuit}</p>
+                <p><strong>Date:</strong> {result.race.date}</p>
+                <p><strong>Time:</strong> {result.race.time}</p>
+              </div>
+
+              <h3>🏆 Top 5 Drivers</h3>
+              <div className={styles.standings}>
+                {result.drivers.map((driver) => (
+                  <div key={driver.position} className={styles.standingItem}>
+                    <span className={styles.position}>{driver.position}</span>
+                    <span className={styles.name}>{driver.driver}</span>
+                    <span className={styles.team}>{driver.team}</span>
+                    <span className={styles.points}>{driver.points} pts</span>
+                  </div>
+                ))}
+              </div>
+
+              <h3>🏁 Top 5 Teams</h3>
+              <div className={styles.standings}>
+                {result.teams.map((team) => (
+                  <div key={team.position} className={styles.standingItem}>
+                    <span className={styles.position}>{team.position}</span>
+                    <span className={styles.teamName}>{team.team}</span>
+                    <span className={styles.points}>{team.points} pts</span>
+                  </div>
+                ))}
+              </div>
             </div>
 
             <details className={styles.scriptPreview}>
-              <summary>📝 View Generated Script</summary>
-              <pre>{result.script}</pre>
+              <summary>📝 View Generated Scripts (3 Chapters)</summary>
+              <div className={styles.chapters}>
+                <div className={styles.chapter}>
+                  <h4>Chapter 1: Next Race</h4>
+                  <pre>{result.script.chapter1}</pre>
+                </div>
+                <div className={styles.chapter}>
+                  <h4>Chapter 2: Driver Standings</h4>
+                  <pre>{result.script.chapter2}</pre>
+                </div>
+                <div className={styles.chapter}>
+                  <h4>Chapter 3: Team Standings</h4>
+                  <pre>{result.script.chapter3}</pre>
+                </div>
+              </div>
             </details>
           </div>
         )}
