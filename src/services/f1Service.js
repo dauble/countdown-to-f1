@@ -43,6 +43,8 @@ export async function getNextRace() {
       { signal: AbortSignal.timeout(5000) }
     );
 
+    console.log("F1 API response:", response);
+
     if (!response.ok) {
       throw new Error("Failed to fetch race data");
     }
@@ -83,27 +85,88 @@ export async function getNextRace() {
 export async function getDriverStandings() {
   try {
     const currentYear = new Date().getFullYear();
+    const currentMonth = new Date().getMonth(); // 0-11
     
-    // The OpenF1 API doesn't have a direct standings endpoint
-    // We'll fetch drivers and their data for the current season
-    const response = await fetch(
-      `${F1_API_BASE}/drivers?session_key=latest`,
+    // If we're before March (month 2), use previous year's final standings
+    const yearToUse = currentMonth < 2 ? currentYear - 1 : currentYear;
+    
+    console.log(`Fetching driver standings for year: ${yearToUse}`);
+    
+    // Get the last race session of the season to get final standings
+    const sessionsResponse = await fetch(
+      `${F1_API_BASE}/sessions?session_name=Race&year=${yearToUse}`,
       { signal: AbortSignal.timeout(5000) }
     );
 
-    if (!response.ok) {
+    if (!sessionsResponse.ok) {
+      throw new Error("Failed to fetch race sessions");
+    }
+
+    const sessions = await sessionsResponse.json();
+    
+    if (!sessions || sessions.length === 0) {
+      throw new Error("No race sessions found");
+    }
+    
+    // Get the last race session
+    const lastSession = sessions[sessions.length - 1];
+    
+    // Fetch position data from the last session to get championship standings
+    const positionResponse = await fetch(
+      `${F1_API_BASE}/position?session_key=${lastSession.session_key}`,
+      { signal: AbortSignal.timeout(5000) }
+    );
+
+    if (!positionResponse.ok) {
+      throw new Error("Failed to fetch position data");
+    }
+
+    const positions = await positionResponse.json();
+    
+    if (!positions || positions.length === 0) {
+      throw new Error("No position data found");
+    }
+    
+    // Get the final position (last timestamp) for each driver
+    const driverFinalPositions = new Map();
+    
+    positions.forEach(pos => {
+      const existing = driverFinalPositions.get(pos.driver_number);
+      if (!existing || new Date(pos.date) > new Date(existing.date)) {
+        driverFinalPositions.set(pos.driver_number, pos);
+      }
+    });
+    
+    // Fetch driver details to get names and teams
+    const driversResponse = await fetch(
+      `${F1_API_BASE}/drivers?session_key=${lastSession.session_key}`,
+      { signal: AbortSignal.timeout(5000) }
+    );
+
+    if (!driversResponse.ok) {
       throw new Error("Failed to fetch driver data");
     }
 
-    const drivers = await response.json();
+    const drivers = await driversResponse.json();
+    const driverMap = new Map(
+      drivers.map(d => [d.driver_number, d])
+    );
     
-    // Return top 5 drivers (using mock points since API doesn't provide standings directly)
-    return drivers.slice(0, 5).map((driver, index) => ({
-      position: index + 1,
-      driver: driver.full_name || `${driver.first_name} ${driver.last_name}`,
-      team: driver.team_name || "Unknown Team",
-      points: 500 - (index * 50) // Mock points for demonstration
-    }));
+    // Sort by final position and take top 5
+    const sortedPositions = Array.from(driverFinalPositions.values())
+      .sort((a, b) => a.position - b.position)
+      .slice(0, 5);
+    
+    // Map to driver standings format
+    return sortedPositions.map((pos, index) => {
+      const driver = driverMap.get(pos.driver_number);
+      return {
+        position: pos.position || (index + 1),
+        driver: driver ? (driver.full_name || `${driver.first_name} ${driver.last_name}`) : `Driver ${pos.driver_number}`,
+        team: driver?.team_name || "Unknown Team",
+        points: Math.max(500 - (pos.position - 1) * 50, 0) // Estimated points based on position
+      };
+    });
   } catch (error) {
     console.log("Using mock driver standings due to API error:", error.message);
     return MOCK_DATA.drivers;
@@ -114,9 +177,70 @@ export async function getDriverStandings() {
  * Get current constructor/team standings (top 5)
  */
 export async function getTeamStandings() {
-  // OpenF1 API doesn't have team standings endpoint
-  // Return mock data for demonstration
-  return MOCK_DATA.teams;
+  try {
+    const currentYear = new Date().getFullYear();
+    const currentMonth = new Date().getMonth(); // 0-11
+    
+    // If we're before March (month 2), use previous year's final standings
+    const yearToUse = currentMonth < 2 ? currentYear - 1 : currentYear;
+    
+    console.log(`Fetching team standings for year: ${yearToUse}`);
+    
+    // Get the last race session of the season
+    const sessionsResponse = await fetch(
+      `${F1_API_BASE}/sessions?session_name=Race&year=${yearToUse}`,
+      { signal: AbortSignal.timeout(5000) }
+    );
+
+    if (!sessionsResponse.ok) {
+      throw new Error("Failed to fetch race sessions");
+    }
+
+    const sessions = await sessionsResponse.json();
+    
+    if (!sessions || sessions.length === 0) {
+      throw new Error("No race sessions found");
+    }
+    
+    // Get the last race session
+    const lastSession = sessions[sessions.length - 1];
+    
+    // Fetch drivers from the last session to extract teams
+    const driversResponse = await fetch(
+      `${F1_API_BASE}/drivers?session_key=${lastSession.session_key}`,
+      { signal: AbortSignal.timeout(5000) }
+    );
+
+    if (!driversResponse.ok) {
+      throw new Error("Failed to fetch team data");
+    }
+
+    const drivers = await driversResponse.json();
+    
+    if (!drivers || drivers.length === 0) {
+      throw new Error("No team data found");
+    }
+    
+    // Extract unique teams
+    const uniqueTeams = Array.from(
+      new Map(drivers.map(d => [d.team_name, d])).values()
+    );
+    
+    // Create team standings with mock points
+    const teamStandings = uniqueTeams
+      .filter(d => d.team_name) // Only include teams with names
+      .slice(0, 5)
+      .map((driver, index) => ({
+        position: index + 1,
+        team: driver.team_name,
+        points: 860 - (index * 100) // Mock points (API doesn't provide standings)
+      }));
+    
+    return teamStandings.length > 0 ? teamStandings : MOCK_DATA.teams;
+  } catch (error) {
+    console.log("Using mock team standings due to API error:", error.message);
+    return MOCK_DATA.teams;
+  }
 }
 
 /**
@@ -129,6 +253,7 @@ function formatRaceData(session) {
     name: session.meeting_name || session.location || "Formula 1 Race",
     location: session.location || session.country_name || "Unknown Location",
     circuit: session.circuit_short_name || session.circuit_key || "Unknown Circuit",
+    dateStart: session.date_start, // Keep original ISO date for timezone conversion
     date: raceDate.toLocaleDateString('en-US', { 
       weekday: 'long', 
       year: 'numeric', 
