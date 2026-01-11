@@ -1,6 +1,27 @@
-# 🎉 Project Complete - Ready for Open Source Release!
+# 🎉 Version 1.1.0 - OAuth Fixes & Auto-Deployment
 
-## ✅ What's Been Implemented
+## 🆕 What's New in v1.1.0
+
+### 🔧 Major Fixes
+
+- **Fixed OAuth redirect URLs** - App now works correctly on Fly.io and other deployment platforms
+- **Runtime URL detection** - Uses request headers (`x-forwarded-host`, `x-forwarded-proto`) to determine the correct base URL
+- **No more localhost redirects** - Production deployments redirect to the correct domain
+
+### 🚀 New Features
+
+- **GitHub Actions CI/CD** - Automatic deployment to Fly.io when pushing to main branch
+- **Simplified configuration** - No need for `NEXT_PUBLIC_APP_URL` environment variable
+- **Better debugging** - Console logs for OAuth URL detection
+
+### 📝 Documentation Updates
+
+- Updated README with simplified deployment steps
+- Added OAuth troubleshooting section
+- Updated .env.example to reflect changes
+- Added CHANGELOG.md for version tracking
+
+## ✅ What's Been Implemented (v1.0.0 + v1.1.0)
 
 ### 1. Auto-Update Feature
 

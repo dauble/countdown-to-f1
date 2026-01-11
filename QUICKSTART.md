@@ -16,7 +16,9 @@ Get your Yoto F1 Card Generator running in 5 minutes!
 2. Sign in or create an account
 3. Create a new application:
    - Name: "F1 Card Generator"
-   - Redirect URI: `http://localhost:3000/api/auth/callback`
+   - Redirect URIs:
+     - `http://localhost:3000/api/auth/callback` (for local dev)
+     - `https://your-app-name.fly.dev/api/auth/callback` (for production, if deploying)
 4. Copy your **Client ID** and **Client Secret**
 
 ### 2️⃣ Install the App (2 min)
@@ -45,8 +47,9 @@ Your `.env` should look like:
 ```env
 YOTO_CLIENT_ID=abc123xyz
 YOTO_CLIENT_SECRET=secret456def
-NEXT_PUBLIC_APP_URL=http://localhost:3000
 ```
+
+**Pro tip:** No need for `NEXT_PUBLIC_APP_URL` - the app auto-detects the correct URL!
 
 ### 4️⃣ Start the Server (30 seconds)
 

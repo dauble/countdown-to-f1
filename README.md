@@ -48,8 +48,9 @@ A Next.js application that automatically creates and updates Yoto MYO (Make Your
    ```env
    YOTO_CLIENT_ID=your_client_id_here
    YOTO_CLIENT_SECRET=your_client_secret_here
-   NEXT_PUBLIC_APP_URL=http://localhost:3000
    ```
+
+   **Note:** No need for `NEXT_PUBLIC_APP_URL` - the app auto-detects the correct URL at runtime!
 
 4. **Run the development server**
 
@@ -121,13 +122,18 @@ On subsequent generations:
    ```bash
    fly secrets set YOTO_CLIENT_ID=your_client_id
    fly secrets set YOTO_CLIENT_SECRET=your_client_secret
-   fly secrets set NEXT_PUBLIC_APP_URL=https://your-app.fly.dev
    ```
 
 5. **Deploy**
+
    ```bash
    fly deploy
    ```
+
+6. **Set up automatic deployments (optional)**
+   - Get your Fly API token: `fly auth token`
+   - Add `FLY_API_TOKEN` to GitHub repository secrets
+   - Every push to `main` branch will auto-deploy via GitHub Actions!
 
 ### Deploy to Vercel
 
@@ -147,6 +153,9 @@ Contributions are welcome! Please read [CONTRIBUTING.md](CONTRIBUTING.md) for de
 
 - Click the "Connect with Yoto" button to authenticate
 - Check that your OAuth credentials are correct in `.env`
+- Make sure your Yoto app has both redirect URIs configured:
+  - `http://localhost:3000/api/auth/callback` (local)
+  - `https://your-domain.com/api/auth/callback` (production)
 
 ### Card not updating
 
@@ -158,6 +167,12 @@ Contributions are welcome! Please read [CONTRIBUTING.md](CONTRIBUTING.md) for de
 
 - The app auto-detects timezone from your IP
 - If running locally, it may default to your server's timezone
+
+### OAuth redirect issues on deployed app
+
+- The app automatically detects the correct URL using request headers
+- No configuration needed - works on Fly.io, Vercel, and other platforms
+- If issues persist, check your Yoto app redirect URI matches your domain
 
 ## 📄 License
 

@@ -8,8 +8,12 @@ export async function GET(request) {
   const { searchParams } = url;
   const authCode = searchParams.get("code");
   
-  // Determine the base URL from the request
-  const baseUrl = `${url.protocol}//${url.host}`;
+  // Get the correct host from headers (handles proxies/load balancers)
+  const host = request.headers.get('x-forwarded-host') || request.headers.get('host');
+  const protocol = request.headers.get('x-forwarded-proto') || 'https';
+  const baseUrl = `${protocol}://${host}`;
+  
+  console.log('Callback - Detected base URL:', baseUrl);
 
   if (!authCode) {
     return new Response("Missing authorization code", { status: 400 });
@@ -41,12 +45,10 @@ export async function GET(request) {
     const tokens = await tokenResponse.json();
     storeTokens(tokens.access_token, tokens.refresh_token);
 
-    const url = new URL(request.url);
-    return Response.redirect(new URL("/", url.origin));
+    return Response.redirect(new URL("/", baseUrl));
   } catch (error) {
     console.error("Auth callback error:", error);
-    const url = new URL(request.url);
-    return Response.redirect(new URL("/?error=auth_failed", url.origin));
+    return Response.redirect(new URL("/?error=auth_failed", baseUrl));
   }
 }
 
