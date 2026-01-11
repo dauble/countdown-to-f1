@@ -4,8 +4,12 @@ import Configstore from "configstore";
 const config = new Configstore("yoto-f1-card-tokens");
 
 export async function GET(request) {
-  const { searchParams } = new URL(request.url);
+  const url = new URL(request.url);
+  const { searchParams } = url;
   const authCode = searchParams.get("code");
+  
+  // Determine the base URL from the request
+  const baseUrl = `${url.protocol}//${url.host}`;
 
   if (!authCode) {
     return new Response("Missing authorization code", { status: 400 });
@@ -24,7 +28,7 @@ export async function GET(request) {
           client_id: process.env.YOTO_CLIENT_ID,
           client_secret: process.env.YOTO_CLIENT_SECRET,
           code: authCode,
-          redirect_uri: `${process.env.NEXT_PUBLIC_APP_URL}/api/auth/callback`,
+          redirect_uri: `${baseUrl}/api/auth/callback`,
         }),
       }
     );
