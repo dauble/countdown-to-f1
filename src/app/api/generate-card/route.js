@@ -135,7 +135,7 @@ export async function POST(request) {
     if (yotoResult.cardId) {
       try {
         deviceDeployment = await deployToAllDevices(yotoResult.cardId, accessToken);
-        console.log('Device deployment result:', deviceDeployment);
+        console.log(`Device deployment: ${deviceDeployment.success}/${deviceDeployment.total} successful`);
       } catch (deployError) {
         console.error('Failed to deploy to devices:', deployError);
         // Don't fail the entire request if device deployment fails

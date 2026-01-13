@@ -167,7 +167,8 @@ export async function getDevices(accessToken) {
     }
 
     const data = await response.json();
-    console.log('Fetched devices:', data);
+    // Log only device count for privacy
+    console.log(`Fetched ${data.devices?.length || 0} device(s)`);
     
     return data.devices || [];
   } catch (error) {
@@ -205,7 +206,7 @@ export async function deployToDevice(deviceId, cardId, accessToken) {
     }
 
     const result = await response.json();
-    console.log(`Deployed to device ${deviceId}:`, result);
+    console.log(`Successfully deployed to device ${deviceId}`);
     
     return result;
   } catch (error) {
