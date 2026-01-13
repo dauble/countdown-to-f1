@@ -157,6 +157,61 @@
   font-style: italic;
 }
 
+.deviceDeployment {
+  background: white;
+  padding: 1.5rem;
+  border-radius: 8px;
+  margin-bottom: 1rem;
+  border-left: 4px solid #4caf50;
+}
+
+.deviceDeployment h3 {
+  color: #4caf50;
+  margin-top: 0;
+  margin-bottom: 1rem;
+}
+
+.deviceDeployment p {
+  margin: 0.5rem 0;
+  color: #333;
+}
+
+.deploymentSuccess {
+  padding: 0.75rem;
+  background: #e8f5e9;
+  border-radius: 6px;
+  color: #2e7d32;
+  font-weight: 500;
+  margin-top: 0.75rem;
+}
+
+.deploymentWarning {
+  padding: 0.75rem;
+  background: #fff3e0;
+  border-radius: 6px;
+  color: #ef6c00;
+  font-weight: 500;
+  margin-top: 0.75rem;
+}
+
+.deploymentError {
+  padding: 0.75rem;
+  background: #ffebee;
+  border-radius: 6px;
+  color: #c62828;
+  font-weight: 500;
+  margin-top: 0.75rem;
+}
+
+.deploymentNote {
+  padding: 0.75rem;
+  background: #e3f2fd;
+  border-radius: 6px;
+  color: #1565c0;
+  font-style: italic;
+  margin-top: 0.75rem;
+}
+
 .weatherInfo {
   background: white;
   padding: 1.5rem;
