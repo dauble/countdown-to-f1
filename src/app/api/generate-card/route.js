@@ -1,6 +1,6 @@
 // API Route to generate a Formula 1 card
 import { getNextRace, getDriverStandings, getTeamStandings, generateF1Script } from "@/services/f1Service";
-import { createTextToSpeechPlaylist, buildF1Chapters } from "@/services/yotoService";
+import { createTextToSpeechPlaylist, buildF1Chapters, deployToAllDevices } from "@/services/yotoService";
 import Configstore from "configstore";
 
 const config = new Configstore("yoto-f1-card-tokens");
@@ -130,7 +130,25 @@ export async function POST(request) {
       storeCardId(yotoResult.cardId);
     }
 
-    // Step 9: Return success with job information
+    // Step 9: Deploy the playlist to all devices
+    let deviceDeployment = null;
+    if (yotoResult.cardId) {
+      try {
+        deviceDeployment = await deployToAllDevices(yotoResult.cardId, accessToken);
+        console.log(`Device deployment: ${deviceDeployment.success}/${deviceDeployment.total} successful`);
+      } catch (deployError) {
+        console.error('Failed to deploy to devices:', deployError);
+        // Don't fail the entire request if device deployment fails
+        deviceDeployment = {
+          success: 0,
+          failed: 0,
+          total: 0,
+          error: deployError.message,
+        };
+      }
+    }
+
+    // Step 10: Return success with job information
     return Response.json({
       success: true,
       race: raceData,
@@ -138,6 +156,7 @@ export async function POST(request) {
       teams: teamStandings,
       script,
       yoto: yotoResult,
+      deviceDeployment,
       isUpdate: !!existingCardId,
       message: existingCardId 
         ? "Formula 1 card updated successfully! Changes will appear in your Yoto library shortly."

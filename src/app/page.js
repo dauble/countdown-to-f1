@@ -1,11 +1,30 @@
 "use client";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import styles from "./page.module.css";
 
 export default function Home() {
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState(null);
   const [error, setError] = useState(null);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [checkingAuth, setCheckingAuth] = useState(true);
+
+  // Check authentication status on mount
+  useEffect(() => {
+    const checkAuth = async () => {
+      try {
+        const response = await fetch("/api/auth/status");
+        const data = await response.json();
+        setIsAuthenticated(data.authenticated);
+      } catch (err) {
+        console.error("Failed to check auth status:", err);
+        setIsAuthenticated(false);
+      } finally {
+        setCheckingAuth(false);
+      }
+    };
+    checkAuth();
+  }, []);
 
   const handleGenerateCard = async (e) => {
     e.preventDefault();
@@ -46,21 +65,29 @@ export default function Home() {
           Generate custom Yoto cards with the latest Formula 1 information
         </p>
 
-        <div className={styles.authSection}>
-          <a href="/api/auth/login" className={styles.loginButton}>
-            🔐 Connect with Yoto
-          </a>
-        </div>
+        {!checkingAuth && (
+          <>
+            {!isAuthenticated && (
+              <div className={styles.authSection}>
+                <a href="/api/auth/login" className={styles.loginButton}>
+                  🔐 Connect with Yoto
+                </a>
+              </div>
+            )}
 
-        <form onSubmit={handleGenerateCard} className={styles.form}>
-          <button
-            type="submit"
-            disabled={loading}
-            className={styles.button}
-          >
-            {loading ? "Generating..." : "Generate F1 Card"}
-          </button>
-        </form>
+            {isAuthenticated && (
+              <form onSubmit={handleGenerateCard} className={styles.form}>
+                <button
+                  type="submit"
+                  disabled={loading}
+                  className={styles.button}
+                >
+                  {loading ? "Generating..." : "Generate F1 Card"}
+                </button>
+              </form>
+            )}
+          </>
+        )}
 
         {error && (
           <div className={styles.error}>
@@ -85,6 +112,38 @@ export default function Home() {
                     ? "Your existing card is being updated with the latest race information. The changes will appear in your Yoto library shortly."
                     : "The card is being processed and will appear in your Yoto library shortly. Future updates will automatically refresh this same card!"}
                 </p>
+              </div>
+            )}
+
+            {result.deviceDeployment && (
+              <div className={styles.deviceDeployment}>
+                <h3>📡 Device Deployment</h3>
+                {result.deviceDeployment.error ? (
+                  <p className={styles.deploymentError}>
+                    ⚠️ Could not deploy to devices: {result.deviceDeployment.error}
+                  </p>
+                ) : (
+                  <>
+                    <p>
+                      <strong>Deployed:</strong> {result.deviceDeployment.success} of {result.deviceDeployment.total} device(s)
+                    </p>
+                    {result.deviceDeployment.failed > 0 && (
+                      <p className={styles.deploymentWarning}>
+                        ⚠️ {result.deviceDeployment.failed} device(s) failed to receive the playlist
+                      </p>
+                    )}
+                    {result.deviceDeployment.total === 0 && (
+                      <p className={styles.deploymentNote}>
+                        ℹ️ No devices found. The playlist is in your library and can be played on any device.
+                      </p>
+                    )}
+                    {result.deviceDeployment.success > 0 && (
+                      <p className={styles.deploymentSuccess}>
+                        ✅ Playlist has been sent to your device(s) and should start playing shortly!
+                      </p>
+                    )}
+                  </>
+                )}
               </div>
             )}
             

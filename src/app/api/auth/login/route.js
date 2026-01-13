@@ -2,7 +2,8 @@
 export async function GET(request) {
   // Get the correct host from headers (handles proxies/load balancers)
   const host = request.headers.get('x-forwarded-host') || request.headers.get('host');
-  const protocol = request.headers.get('x-forwarded-proto') || 'https';
+  // Use http for localhost, https for everything else
+  const protocol = request.headers.get('x-forwarded-proto') || (host?.startsWith('localhost') ? 'http' : 'https');
   const baseUrl = `${protocol}://${host}`;
   
   console.log('Login - Detected base URL:', baseUrl);

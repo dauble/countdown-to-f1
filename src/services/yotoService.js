@@ -2,6 +2,7 @@
 // API Documentation: https://yoto.dev/myo/labs-tts/
 
 const YOTO_LABS_API_BASE = "https://labs.api.yotoplay.com";
+const YOTO_API_BASE = "https://api.yotoplay.com";
 const DEFAULT_VOICE_ID = "JBFqnCBsd6RMkjVDRZzb"; // ElevenLabs voice ID
 
 /**
@@ -141,6 +142,116 @@ export async function checkJobStatus(jobId, accessToken) {
 
   } catch (error) {
     console.error("Job status check error:", error);
+    throw error;
+  }
+}
+
+/**
+ * Get all devices associated with the user's account
+ * @param {string} accessToken - Yoto API access token
+ * @returns {Promise<Array>} Array of device objects
+ */
+export async function getDevices(accessToken) {
+  try {
+    const response = await fetch(`${YOTO_API_BASE}/me/devices`, {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${accessToken}`,
+        'Accept': 'application/json',
+      },
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`Failed to fetch devices: ${errorText}`);
+    }
+
+    const data = await response.json();
+    // Log only device count for privacy
+    console.log(`Fetched ${data.devices?.length || 0} device(s)`);
+    
+    return data.devices || [];
+  } catch (error) {
+    console.error("Device fetch error:", error);
+    throw error;
+  }
+}
+
+/**
+ * Deploy a playlist to a specific device
+ * @param {string} deviceId - Device ID to deploy to
+ * @param {string} cardId - Card ID to deploy
+ * @param {string} accessToken - Yoto API access token
+ * @returns {Promise<Object>} Deployment result
+ */
+export async function deployToDevice(deviceId, cardId, accessToken) {
+  try {
+    const response = await fetch(
+      `${YOTO_API_BASE}/devices/${deviceId}/playlist`,
+      {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${accessToken}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          cardId: cardId,
+        }),
+      }
+    );
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`Failed to deploy to device ${deviceId}: ${errorText}`);
+    }
+
+    const result = await response.json();
+    console.log(`Successfully deployed to device ${deviceId}`);
+    
+    return result;
+  } catch (error) {
+    console.error(`Deploy to device ${deviceId} error:`, error);
+    throw error;
+  }
+}
+
+/**
+ * Deploy a playlist to all devices
+ * @param {string} cardId - Card ID to deploy
+ * @param {string} accessToken - Yoto API access token
+ * @returns {Promise<Object>} Deployment results with success/failure counts
+ */
+export async function deployToAllDevices(cardId, accessToken) {
+  try {
+    const devices = await getDevices(accessToken);
+    
+    if (!devices || devices.length === 0) {
+      console.log('No devices found to deploy to');
+      return {
+        success: 0,
+        failed: 0,
+        total: 0,
+        devices: [],
+      };
+    }
+
+    console.log(`Deploying card ${cardId} to ${devices.length} device(s)`);
+    
+    const results = await Promise.allSettled(
+      devices.map(device => deployToDevice(device.id, cardId, accessToken))
+    );
+
+    const successful = results.filter(r => r.status === 'fulfilled').length;
+    const failed = results.filter(r => r.status === 'rejected').length;
+
+    return {
+      success: successful,
+      failed: failed,
+      total: devices.length,
+      devices: devices.map(d => ({ id: d.id, name: d.name })),
+    };
+  } catch (error) {
+    console.error("Deploy to all devices error:", error);
     throw error;
   }
 }
