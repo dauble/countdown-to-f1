@@ -515,7 +515,9 @@ export async function createAudioCard({
         media: {
           duration: mediaInfo?.duration,
           fileSize: mediaInfo?.fileSize,
-          readableFileSize: Math.round((mediaInfo?.fileSize / 1024 / 1024) * 10) / 10,
+          readableFileSize: mediaInfo?.fileSize 
+            ? Math.round((mediaInfo.fileSize / 1024 / 1024) * 10) / 10 
+            : 0,
         },
       },
     };
