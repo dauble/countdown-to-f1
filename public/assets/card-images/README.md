@@ -17,7 +17,7 @@ This directory stores card cover images that will be uploaded to Yoto and displa
 
 ## Current Images
 
-- `f1-card-cover.jpg` - Default F1 card cover (add your own image here)
+- `countdown-to-f1-card.png` - Default F1 card cover (replace with your own image using this filename)
 
 ## API Reference
 

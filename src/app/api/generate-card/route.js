@@ -89,7 +89,8 @@ async function uploadCardCoverImage(accessToken) {
         
         return mediaUrl;
       } catch (err) {
-        // File not found, continue to next possibility
+        console.warn(`Failed to load or upload cover image "${imageName}", trying next candidate:`, err);
+        // File not found or other error, continue to next possibility
         continue;
       }
     }

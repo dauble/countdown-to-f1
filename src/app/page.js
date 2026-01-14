@@ -53,6 +53,9 @@ export default function Home() {
     };
 
     // Poll immediately, then every 3 seconds
+    // Note: TTS job status polling uses 3 seconds as TTS generation is typically slower
+    // and less frequent status updates are sufficient, whereas audio transcoding (1 second)
+    // is faster and benefits from more frequent polling for better UX
     pollJobStatus();
     const interval = setInterval(pollJobStatus, 3000);
 
@@ -109,6 +112,12 @@ export default function Home() {
       const fileInput = e.target.elements.audioFile;
       if (!fileInput.files[0]) {
         throw new Error('Please select an audio file');
+      }
+
+      // Validate file size (100MB limit)
+      const maxSize = 100 * 1024 * 1024; // 100MB in bytes
+      if (fileInput.files[0].size > maxSize) {
+        throw new Error('File size exceeds 100MB limit. Please choose a smaller file.');
       }
 
       const formData = new FormData();
