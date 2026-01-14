@@ -9,6 +9,7 @@ const MOCK_DATA = {
     name: "Australian Grand Prix",
     location: "Melbourne, Australia",
     circuit: "Albert Park Circuit",
+    dateStart: "2024-03-24T05:00:00.000Z", // ISO date for timezone conversion
     date: "Sunday, March 24, 2024",
     time: "03:00 PM AEDT",
     year: 2024
