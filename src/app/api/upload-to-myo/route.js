@@ -137,16 +137,34 @@ export async function POST(request) {
 
   } catch (error) {
     console.error('MYO upload error:', error);
-    
-    if (error.message.includes('401') || error.message.includes('unauthorized')) {
+
+    const status =
+      (error && typeof error === 'object' && 'status' in error && error.status) ||
+      (error &&
+        typeof error === 'object' &&
+        'response' in error &&
+        error.response &&
+        typeof error.response === 'object' &&
+        'status' in error.response &&
+        error.response.status);
+
+    const isAuthError =
+      status === 401 ||
+      (error &&
+        typeof error === 'object' &&
+        'message' in error &&
+        typeof error.message === 'string' &&
+        (error.message.includes('401') || error.message.toLowerCase().includes('unauthorized')));
+
+    if (isAuthError) {
       return Response.json(
         { error: "Authentication failed. Please reconnect with Yoto.", needsAuth: true },
         { status: 401 }
       );
     }
-    
+
     return Response.json(
-      { error: error.message || 'Failed to create MYO card' },
+      { error: (error && typeof error === 'object' && 'message' in error && error.message) || 'Failed to create MYO card' },
       { status: 500 }
     );
   }
