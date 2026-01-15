@@ -248,24 +248,14 @@ export async function getTeamStandings() {
  * Format race data for display
  */
 function formatRaceData(session) {
-  const raceDate = new Date(session.date_start);
-  
+  // Don't format date/time here - let generate-card route handle timezone conversion
   return {
     name: session.meeting_name || session.location || "Formula 1 Race",
     location: session.location || session.country_name || "Unknown Location",
     circuit: session.circuit_short_name || session.circuit_key || "Unknown Circuit",
-    dateStart: session.date_start, // Keep original ISO date for timezone conversion
-    date: raceDate.toLocaleDateString('en-US', { 
-      weekday: 'long', 
-      year: 'numeric', 
-      month: 'long', 
-      day: 'numeric' 
-    }),
-    time: raceDate.toLocaleTimeString('en-US', { 
-      hour: '2-digit', 
-      minute: '2-digit',
-      timeZoneName: 'short'
-    }),
+    dateStart: session.date_start, // ISO date for timezone conversion in API route
+    date: null, // Will be set by API route with user's timezone
+    time: null, // Will be set by API route with user's timezone
     year: session.year
   };
 }

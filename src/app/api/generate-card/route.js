@@ -93,6 +93,9 @@ export async function POST(request) {
     // Step 4: Convert race time to user's timezone
     if (raceData.dateStart) {
       const raceDate = new Date(raceData.dateStart);
+      
+      // Format both date and time in user's timezone
+      // This ensures the correct calendar day is shown (handles day rollover)
       raceData.date = raceDate.toLocaleDateString('en-US', { 
         weekday: 'long', 
         year: 'numeric', 
@@ -106,6 +109,10 @@ export async function POST(request) {
         timeZoneName: 'short',
         timeZone: userTimezone
       });
+    } else {
+      // Fallback for mock data without dateStart - use pre-formatted values
+      // This shouldn't happen anymore since all data should include dateStart
+      console.warn('Race data missing dateStart field, using pre-formatted date/time');
     }
 
     // Step 5: Generate script for text-to-speech
