@@ -10,8 +10,8 @@ const MOCK_DATA = {
     location: "Melbourne, Australia",
     circuit: "Albert Park Circuit",
     dateStart: "2024-03-24T05:00:00.000Z", // ISO date for timezone conversion
-    date: "Sunday, March 24, 2024",
-    time: "03:00 PM AEDT",
+    date: null, // Will be converted to user's timezone in API route
+    time: null, // Will be converted to user's timezone in API route
     year: 2024
   },
   drivers: [
