@@ -82,7 +82,6 @@ export async function POST(request) {
 
     // Step 2: Get user's timezone
     const userTimezone = await getUserTimezone(request);
-    console.log(`User timezone detected: ${userTimezone}`);
     
     // Step 3: Fetch F1 data from API
     const [raceData, driverStandings, teamStandings] = await Promise.all([
@@ -94,7 +93,9 @@ export async function POST(request) {
     // Step 4: Convert race time to user's timezone
     if (raceData.dateStart) {
       const raceDate = new Date(raceData.dateStart);
-      console.log(`Converting race time from ${raceData.dateStart} to timezone: ${userTimezone}`);
+      if (process.env.NODE_ENV !== "production") {
+        console.log(`Converting race time from ${raceData.dateStart} to timezone: ${userTimezone}`);
+      }
       
       // Format both date and time in user's timezone
       // This ensures the correct calendar day is shown (handles day rollover)
@@ -111,7 +112,6 @@ export async function POST(request) {
         timeZoneName: 'short',
         timeZone: userTimezone
       });
-      console.log(`Converted to: ${raceData.date} at ${raceData.time}`);
     } else {
       // Fallback for data without dateStart
       console.warn(`Race data missing dateStart field. Date: ${raceData.date}, Time: ${raceData.time}`);
