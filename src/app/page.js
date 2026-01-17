@@ -92,6 +92,8 @@ export default function Home() {
 
       setResult(data);
       setYotoResult(null); // Clear previous yoto result when generating new card
+      setPollingJobId(null); // Clear any existing polling job when starting a new card
+      setJobStatus(null);    // Clear previous job status to avoid stale information
     } catch (err) {
       setError(err.message);
     } finally {
@@ -247,7 +249,7 @@ export default function Home() {
                 {!yotoResult && (
                   <div className={styles.sendToYotoSection}>
                     <p className={styles.devNote}>
-                      🔧 <strong>Development Mode:</strong> Review the generated content below, then click the button to send to Yoto.
+                      🔧 Review the generated content below, then click the button to send to Yoto.
                     </p>
                     <button
                       onClick={handleSendToYoto}
@@ -336,7 +338,7 @@ export default function Home() {
                 )}
                 
                 <div className={styles.f1Info}>
-                  <h3>🏁 Next Session</h3>
+                  <h3>🏁 Race Weekend</h3>
                   <div className={styles.raceInfo}>
                     <p><strong>Name:</strong> {result.race.name}</p>
                     <p><strong>Location:</strong> {result.race.location}, {result.race.country}</p>

@@ -1,38 +1,11 @@
 // API Route to generate a Formula 1 card
 import { getNextRace, getUpcomingSessions, getDriverStandings, getTeamStandings, generateF1Script, getMeetingDetails, getSessionWeather } from "@/services/f1Service";
 import { createTextToSpeechPlaylist, buildF1Chapters, deployToAllDevices } from "@/services/yotoService";
-import { uploadCardCoverImage, uploadCardIcon, uploadCountryFlagIcon } from "@/utils/imageUtils";
-import Configstore from "configstore";
+import { uploadCardIcon, uploadCountryFlagIcon } from "@/utils/imageUtils";
+import { getAccessToken, getStoredCardId, storeCardId, isAuthError, createAuthErrorResponse } from "@/utils/authUtils";
 
 // Delay utility to respect OpenF1 API rate limit (3 requests/second)
 const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
-
-const config = new Configstore("yoto-f1-card-tokens");
-
-/**
- * Get stored access token
- */
-function getAccessToken() {
-  const tokens = config.get("tokens");
-  if (!tokens || !tokens.accessToken) {
-    return null;
-  }
-  return tokens.accessToken;
-}
-
-/**
- * Get stored card ID for updates
- */
-function getStoredCardId() {
-  return config.get("f1CardId");
-}
-
-/**
- * Store card ID for future updates
- */
-function storeCardId(cardId) {
-  config.set("f1CardId", cardId);
-}
 
 /**
  * Get user's timezone from IP address
@@ -194,7 +167,7 @@ export async function POST(request) {
     }
 
     // Step 8: Build chapters for Yoto playlist with custom icon, sessions, and enhanced details
-    const chapters = buildF1Chapters(raceData, sessions, iconMediaId, meetingDetails, weather, countryFlagIconId);
+    const chapters = buildF1Chapters(raceData, sessions, iconMediaId, weather, countryFlagIconId);
 
     // Step 9: Return success with generated data (not sent to Yoto yet)
     return Response.json({
@@ -212,20 +185,8 @@ export async function POST(request) {
   } catch (error) {
     console.error("F1 card generation error:", error);
     
-    // Check if it's an auth error by checking status code first
-    const isAuthError = 
-      error.status === 401 ||
-      (error.message && typeof error.message === 'string' && 
-       (error.message.includes('401') || error.message.toLowerCase().includes('unauthorized')));
-    
-    if (isAuthError) {
-      return Response.json(
-        {
-          error: "Authentication failed. Please reconnect with Yoto.",
-          needsAuth: true,
-        },
-        { status: 401 }
-      );
+    if (isAuthError(error)) {
+      return createAuthErrorResponse();
     }
     
     return Response.json(
