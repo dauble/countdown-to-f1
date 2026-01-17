@@ -8,10 +8,10 @@ export async function POST() {
     config.delete("tokens");
     config.delete("f1CardId");
     config.delete("f1MyoCardId");
-    return Response.redirect(new URL("/", process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"));
+    return Response.json({ success: true, message: "Logged out successfully" });
   } catch (error) {
     console.error("Logout error:", error);
-    return new Response("Logout failed", { status: 500 });
+    return Response.json({ success: false, error: "Logout failed" }, { status: 500 });
   }
 }
 
@@ -20,9 +20,9 @@ export async function GET() {
     config.delete("tokens");
     config.delete("f1CardId");
     config.delete("f1MyoCardId");
-    return Response.redirect(new URL("/", process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"));
+    return Response.json({ success: true, message: "Logged out successfully" });
   } catch (error) {
     console.error("Logout error:", error);
-    return new Response("Logout failed", { status: 500 });
+    return Response.json({ success: false, error: "Logout failed" }, { status: 500 });
   }
 }
