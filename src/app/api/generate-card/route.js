@@ -1,5 +1,5 @@
 // API Route to generate a Formula 1 card
-import { getNextRace, getDriverStandings, getTeamStandings, generateF1Script } from "@/services/f1Service";
+import { getNextRace, getUpcomingSessions, getDriverStandings, getTeamStandings, generateF1Script } from "@/services/f1Service";
 import { createTextToSpeechPlaylist, buildF1Chapters, deployToAllDevices } from "@/services/yotoService";
 import { uploadCardCoverImage, uploadCardIcon } from "@/utils/imageUtils";
 import Configstore from "configstore";
@@ -118,14 +118,43 @@ export async function POST(request) {
       console.warn('Cannot convert to user timezone without ISO timestamp');
     }
 
+    // Step 4a: Fetch all upcoming sessions for this race weekend
+    let sessions = [];
+    if (raceData.meetingKey) {
+      const rawSessions = await getUpcomingSessions(raceData.meetingKey);
+      
+      // Convert session times to user's timezone
+      sessions = rawSessions.map(session => {
+        const sessionDate = new Date(session.dateStart);
+        return {
+          ...session,
+          date: sessionDate.toLocaleDateString('en-US', {
+            weekday: 'long',
+            year: 'numeric',
+            month: 'long',
+            day: 'numeric',
+            timeZone: userTimezone
+          }),
+          time: sessionDate.toLocaleTimeString('en-US', {
+            hour: '2-digit',
+            minute: '2-digit',
+            timeZoneName: 'short',
+            timeZone: userTimezone
+          })
+        };
+      });
+      
+      console.log(`Found ${sessions.length} upcoming sessions for this race weekend`);
+    }
+
     // Step 5: Generate script for text-to-speech
     const script = generateF1Script(raceData, driverStandings, teamStandings);
 
     // Step 6: Upload custom icon if available (16x16 for display on Yoto device)
     const iconMediaId = await uploadCardIcon(accessToken);
 
-    // Step 7: Build chapters for Yoto playlist with custom icon
-    const chapters = buildF1Chapters(raceData, iconMediaId);
+    // Step 7: Build chapters for Yoto playlist with custom icon and sessions
+    const chapters = buildF1Chapters(raceData, sessions, iconMediaId);
 
     // Step 8: Check if we should update existing card
     const existingCardId = shouldUpdate ? getStoredCardId() : null;
@@ -173,7 +202,10 @@ export async function POST(request) {
       drivers: driverStandings,
       teams: teamStandings,
       script,
-      yoto: yotoResult,
+      yoto: {
+        ...yotoResult,
+        chapters, // Include chapters data so UI can display all content
+      },
       deviceDeployment,
       isUpdate: !!existingCardId,
       message: existingCardId 

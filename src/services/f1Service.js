@@ -81,6 +81,48 @@ export async function getNextRace() {
 }
 
 /**
+ * Get all upcoming sessions for a meeting (Practice, Qualifying, Sprint, Race, etc.)
+ * @param {number} meetingKey - The meeting key from the race session
+ * @returns {Promise<Array>} Array of session objects
+ */
+export async function getUpcomingSessions(meetingKey) {
+  try {
+    const now = new Date().toISOString();
+    
+    // Fetch all sessions for this meeting that haven't ended yet
+    const response = await fetch(
+      `${F1_API_BASE}/sessions?meeting_key=${meetingKey}&date_start>=${now.split('T')[0]}`,
+      { signal: AbortSignal.timeout(5000) }
+    );
+
+    if (!response.ok) {
+      throw new Error("Failed to fetch sessions");
+    }
+
+    const sessions = await response.json();
+    
+    if (!sessions || sessions.length === 0) {
+      return [];
+    }
+    
+    // Sort by date_start to ensure chronological order
+    return sessions
+      .sort((a, b) => new Date(a.date_start) - new Date(b.date_start))
+      .map(session => ({
+        sessionName: session.session_name,
+        sessionType: session.session_type,
+        dateStart: session.date_start,
+        dateEnd: session.date_end,
+        location: session.location,
+        circuitName: session.circuit_short_name,
+      }));
+  } catch (error) {
+    console.log("Error fetching sessions:", error.message);
+    return [];
+  }
+}
+
+/**
  * Get current driver standings (top 5)
  */
 export async function getDriverStandings() {
@@ -256,7 +298,8 @@ function formatRaceData(session) {
     dateStart: session.date_start, // ISO date for timezone conversion in API route
     date: null, // Will be set by API route with user's timezone
     time: null, // Will be set by API route with user's timezone
-    year: session.year
+    year: session.year,
+    meetingKey: session.meeting_key // Needed to fetch all sessions for this meeting
   };
 }
 

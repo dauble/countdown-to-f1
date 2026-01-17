@@ -137,7 +137,8 @@ export async function createTextToSpeechPlaylist({
       content.cardId = cardId;
     }
 
-    console.log("Creating Yoto TTS playlist:", content);
+    console.log("Creating Yoto TTS playlist with", chapters.length, "chapters");
+    console.log("Chapters structure:", JSON.stringify(content.content.chapters, null, 2));
 
     // Submit to Labs API
     const response = await fetch(
@@ -320,32 +321,137 @@ export async function deployToAllDevices(cardId, accessToken) {
 }
 
 /**
- * Convert F1 race data into Yoto chapter format with single track
+ * Convert F1 race data into Yoto chapter format with multiple chapters for each session
  * @param {Object} raceData - Race information
+ * @param {Array} sessions - Array of session objects (Practice, Qualifying, Sprint, Race, etc.)
  * @param {string|null} iconMediaId - Optional custom icon media ID (from uploadCardIcon)
  * @returns {Array} Array of chapter objects
  */
-export function buildF1Chapters(raceData, iconMediaId = null) {
-  // Single chapter with the Next Race information
-  const chapter = {
-    title: "Next F1 Race",
-    icon: iconMediaId ? `yoto:#${iconMediaId}` : null, // Use custom icon if provided
+export function buildF1Chapters(raceData, sessions = [], iconMediaId = null) {
+  const chapters = [];
+  
+  console.log(`Building F1 chapters with ${sessions.length} sessions and iconMediaId: ${iconMediaId || 'none'}`);
+  
+  // Chapter 1: Overall race weekend information
+  chapters.push({
+    title: "Race Weekend Overview",
+    icon: iconMediaId ? `yoto:#${iconMediaId}` : null,
     tracks: [
       {
         title: raceData.name,
-        text: `Hello Formula 1 fans! Let me tell you about the next race in the ${raceData.year} season.
+        text: `Hello Formula 1 fans! Let me tell you about the upcoming ${raceData.name} in the ${raceData.year} season.
+
+This race weekend takes place in ${raceData.location} at the ${raceData.circuit}.
+
+The race is scheduled for ${raceData.date} at ${raceData.time}.
+
+There are ${sessions.length} sessions scheduled for this race weekend. Listen to the following chapters to learn about each session!`,
+        icon: iconMediaId ? `yoto:#${iconMediaId}` : null,
+      }
+    ]
+  });
+  
+  // Add a chapter for each session
+  sessions.forEach((session, index) => {
+    const sessionNumber = index + 1;
+    const sessionText = generateSessionText(session, raceData);
+    
+    chapters.push({
+      title: session.sessionName,
+      icon: iconMediaId ? `yoto:#${iconMediaId}` : null,
+      tracks: [
+        {
+          title: session.sessionName,
+          text: sessionText,
+          icon: iconMediaId ? `yoto:#${iconMediaId}` : null,
+        }
+      ]
+    });
+  });
+  
+  // If no sessions data available, fall back to simple race info
+  if (chapters.length === 1) {
+    chapters[0] = {
+      title: "Next F1 Race",
+      icon: iconMediaId ? `yoto:#${iconMediaId}` : null,
+      tracks: [
+        {
+          title: raceData.name,
+          text: `Hello Formula 1 fans! Let me tell you about the next race in the ${raceData.year} season.
 
 The next race is the ${raceData.name}, taking place in ${raceData.location}.
 
 The race will be held on ${raceData.date}, at ${raceData.time}.
 
 Get ready for an exciting race at ${raceData.circuit}!`,
-        icon: iconMediaId ? `yoto:#${iconMediaId}` : null, // Use custom icon if provided
-      }
-    ]
-  };
+          icon: iconMediaId ? `yoto:#${iconMediaId}` : null,
+        }
+      ]
+    };
+  }
 
-  return [chapter];
+  console.log(`Built ${chapters.length} total chapters for F1 card`);
+  return chapters;
+}
+
+/**
+ * Generate descriptive text for a specific session
+ * @param {Object} session - Session information
+ * @param {Object} raceData - Race information
+ * @returns {string} Descriptive text for the session
+ */
+function generateSessionText(session, raceData) {
+  const sessionType = session.sessionType || session.sessionName;
+  
+  // Customize text based on session type
+  if (sessionType.toLowerCase().includes('practice')) {
+    return `This is ${session.sessionName} for the ${raceData.name}.
+
+Scheduled for ${session.date} at ${session.time}.
+
+Practice sessions give teams the opportunity to fine-tune their car setups and drivers to learn the track. Teams will test different tire compounds and aerodynamic configurations to find the optimal balance between speed and reliability.
+
+Watch for lap times and listen to team radio communications as engineers gather crucial data for the rest of the weekend!`;
+  }
+  
+  if (sessionType.toLowerCase().includes('qualifying')) {
+    return `This is ${session.sessionName} for the ${raceData.name}.
+
+Scheduled for ${session.date} at ${session.time}.
+
+Qualifying determines the starting grid for the race! The session is divided into three knockout rounds: Q1, Q2, and Q3. The slowest drivers are eliminated after Q1 and Q2, while the top 10 battle it out in Q3 for pole position.
+
+Pole position is crucial as it gives the driver the best chance of leading into the first corner. Every hundredth of a second counts!`;
+  }
+  
+  if (sessionType.toLowerCase().includes('sprint')) {
+    return `This is ${session.sessionName} for the ${raceData.name}.
+
+Scheduled for ${session.date} at ${session.time}.
+
+The Sprint is a shorter race format that determines part of the starting grid for the main Grand Prix. It's high-intensity racing with limited laps, so every position matters!
+
+Drivers will be pushing flat out from the start, and with reduced strategic options compared to the main race, overtaking on track becomes even more critical. Points are awarded to the top finishers!`;
+  }
+  
+  if (sessionType.toLowerCase().includes('race')) {
+    return `This is the main ${session.sessionName} of the ${raceData.name}!
+
+Scheduled for ${session.date} at ${session.time}.
+
+This is what it's all about! The Grand Prix will see drivers battle for maximum points over the full race distance. Strategy, tire management, and racecraft will all play crucial roles.
+
+Watch for pit stop strategies, overtaking moves, and how drivers manage their tires over the race distance. Twenty-five points await the winner, and every position counts in the championship battle!
+
+Lights out and away we go!`;
+  }
+  
+  // Default text for other session types
+  return `This is ${session.sessionName} for the ${raceData.name}.
+
+Scheduled for ${session.date} at ${session.time}.
+
+This session is an important part of the ${raceData.name} weekend at ${raceData.circuit}. Teams and drivers will be working hard to prepare for the main race!`;
 }
 
 /**

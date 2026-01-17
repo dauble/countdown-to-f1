@@ -6,12 +6,14 @@ A Next.js application that automatically creates and updates Yoto MYO (Make Your
 
 ### Core Features
 
-- 🏁 **Next Race Information** - Automatically fetches the next upcoming F1 race
-- 🌍 **Timezone Conversion** - Displays race time in the user's local timezone based on IP address
+- 🏁 **Multi-Session Chapters** - Separate chapters for each F1 session (Practice 1-3, Qualifying, Sprint, Race)
+- 📅 **Race Weekend Overview** - First chapter provides overall race weekend information
+- 🌍 **Automatic Timezone Conversion** - Race times converted to your local timezone via IP address detection
 - 🔄 **Auto-Update** - Updates the same card with new race info (no need to create new cards each time)
 - 🎙️ **Text-to-Speech** - Uses ElevenLabs via Yoto Labs API to generate audio
 - 🔐 **OAuth Authentication** - Secure authentication with Yoto (required before use)
 - 📱 **Responsive Design** - Works on desktop and mobile devices
+- 🏎️ **Custom Icons** - Race car icon displays on your Yoto player for each chapter
 
 ### Advanced Features
 
@@ -88,6 +90,13 @@ A Next.js application that automatically creates and updates Yoto MYO (Make Your
 3. **Check Your Library** - The card will appear in your Yoto library when complete
 4. **Link to MYO Card** - Use the Yoto app to link the playlist to your physical MYO card
 5. **Auto-Update** - Click "Generate F1 Card" again anytime to update with the latest race info!
+
+**What You'll Get:**
+
+- **Chapter 1**: Race Weekend Overview - Overall information about the upcoming race
+- **Chapter 2+**: Individual chapters for each session (Practice 1, Practice 2, Practice 3, Qualifying, Sprint if scheduled, and Race)
+- **Custom Icons**: Race car icon (🏎️) displays on your Yoto player
+- **Accurate Times**: All session times automatically converted to your local timezone based on your IP address
 
 ### Upload Audio to MYO Card
 
@@ -176,7 +185,7 @@ On subsequent generations:
 
 ## 🤝 Contributing
 
-Contributions are welcome! Please read [CONTRIBUTING.md](CONTRIBUTING.md) for details on our code of conduct and the process for submitting pull requests.
+Contributions are welcome! Please read [CONTRIBUTING.md](documentation/CONTRIBUTING.md) for details on our code of conduct and the process for submitting pull requests.
 
 ## 🐛 Troubleshooting
 
@@ -217,8 +226,29 @@ Contributions are welcome! Please read [CONTRIBUTING.md](CONTRIBUTING.md) for de
 
 ### Race time showing wrong timezone
 
-- The app auto-detects timezone from your IP
-- If running locally, it may default to your server's timezone
+**How Timezone Detection Works:**
+
+- The app automatically detects your timezone from your IP address using ipapi.co
+- Works for both local development and production deployments
+- If IP detection fails, defaults to the server's timezone
+
+**Local Development:**
+
+- When running locally (localhost), IP detection returns your local IP
+- The app falls back to using `Intl.DateTimeFormat().resolvedOptions().timeZone`
+- This means you'll see times in your computer's configured timezone
+
+**Production Deployment:**
+
+- Uses the `x-forwarded-for` or `x-real-ip` headers from your request
+- Queries ipapi.co API to convert IP → timezone (e.g., "America/New_York")
+- All session times are then converted to this detected timezone
+
+**Troubleshooting:**
+
+- Check server logs - they show: "User timezone detected: [timezone]"
+- Verify your IP isn't being blocked by ipapi.co
+- Private/local IPs (192.168.x.x, 10.x.x.x) automatically fall back to system timezone
 
 ### OAuth redirect issues on deployed app
 
@@ -230,7 +260,17 @@ Contributions are welcome! Please read [CONTRIBUTING.md](CONTRIBUTING.md) for de
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
-## 🙏 Acknowledgments
+## � Documentation
+
+- [Quick Start Guide](documentation/QUICKSTART.md) - Get up and running in 5 minutes
+- [Changelog](documentation/CHANGELOG.md) - Version history and release notes
+- [Session Chapters Feature](documentation/SESSIONS_CHAPTERS_FEATURE.md) - How multi-session chapters work
+- [Cover Image Feature](documentation/COVER_IMAGE_FEATURE.md) - Custom cover image setup
+- [Job Status Feature](documentation/JOB_STATUS_FEATURE.md) - Real-time TTS status polling
+- [MYO Upload Feature](documentation/MYO_UPLOAD_FEATURE.md) - Audio file upload guide
+- [Contributing Guide](documentation/CONTRIBUTING.md) - How to contribute to the project
+
+## �🙏 Acknowledgments
 
 - [Yoto](https://yoto.dev/) for their amazing developer API
 - [OpenF1](https://openf1.org/) for F1 data

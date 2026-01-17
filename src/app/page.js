@@ -283,12 +283,44 @@ export default function Home() {
                 </div>
 
                 <details className={styles.scriptPreview}>
-                  <summary>📝 View Generated Script</summary>
+                  <summary>📝 View Generated Content ({result.yoto?.chapters?.length || 0} chapters)</summary>
                   <div className={styles.chapters}>
-                    <div className={styles.chapter}>
-                      <h4>Chapter 1: Next Race</h4>
-                      <pre>{result.script.chapter1}</pre>
-                    </div>
+                    {result.yoto?.chapters?.map((chapter, index) => (
+                      <div key={index} className={styles.chapter}>
+                        <h4>
+                          {chapter.icon && '🏎️ '} 
+                          Chapter {index + 1}: {chapter.title}
+                        </h4>
+                        {chapter.tracks?.map((track, trackIndex) => (
+                          <div key={trackIndex} className={styles.track}>
+                            <p className={styles.trackTitle}>
+                              <strong>Track:</strong> {track.title}
+                            </p>
+                            <pre className={styles.trackText}>{track.text}</pre>
+                          </div>
+                        ))}
+                      </div>
+                    ))}
+                    {(!result.yoto?.chapters || result.yoto.chapters.length === 0) && result.script && (
+                      <>
+                        <div className={styles.chapter}>
+                          <h4>Chapter 1: Next Race</h4>
+                          <pre>{result.script.chapter1}</pre>
+                        </div>
+                        {result.script.chapter2 && (
+                          <div className={styles.chapter}>
+                            <h4>Chapter 2: Driver Standings</h4>
+                            <pre>{result.script.chapter2}</pre>
+                          </div>
+                        )}
+                        {result.script.chapter3 && (
+                          <div className={styles.chapter}>
+                            <h4>Chapter 3: Team Standings</h4>
+                            <pre>{result.script.chapter3}</pre>
+                          </div>
+                        )}
+                      </>
+                    )}
                   </div>
                 </details>
               </div>

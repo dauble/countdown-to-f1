@@ -73,6 +73,14 @@ You should see:
 5. Watch the real-time status: Queued → Processing → Completed
 6. Check your Yoto library - your card is ready! 🎉
 
+**What You'll Get:**
+
+- Multiple chapters for the upcoming race weekend
+- Chapter 1: Overall race weekend overview
+- Chapters 2+: Individual sessions (Practice 1-3, Qualifying, Sprint, Race)
+- Race car icon (🏎️) displayed on your Yoto player
+- All times automatically converted to your local timezone based on your IP address
+
 ## 🎯 First Time Tips
 
 ### Finding Your Card
