@@ -65,6 +65,69 @@ export async function uploadCardIcon(accessToken) {
 }
 
 /**
+ * Download and upload country flag as icon
+ * @param {string} flagUrl - URL to the country flag image
+ * @param {string} accessToken - Yoto API access token
+ * @param {string} countryName - Name of the country (for filename)
+ * @returns {Promise<string|null>} Media ID of uploaded icon, or null on error
+ */
+export async function uploadCountryFlagIcon(flagUrl, accessToken, countryName = 'country') {
+  try {
+    if (!flagUrl) {
+      console.log('No country flag URL provided');
+      return null;
+    }
+
+    console.log(`Downloading country flag from: ${flagUrl}`);
+    
+    // Download the flag image
+    const flagResponse = await fetch(flagUrl, {
+      signal: AbortSignal.timeout(5000)
+    });
+
+    if (!flagResponse.ok) {
+      throw new Error(`Failed to download flag: ${flagResponse.status}`);
+    }
+
+    const flagBuffer = Buffer.from(await flagResponse.arrayBuffer());
+    
+    console.log(`Downloaded flag (${flagBuffer.length} bytes), uploading to Yoto...`);
+    
+    // Upload flag as icon to Yoto with autoConvert to resize to 16x16
+    const url = new URL('https://api.yotoplay.com/media/displayIcons/user/me/upload');
+    url.searchParams.set('autoConvert', 'true');
+    url.searchParams.set('filename', `${countryName.toLowerCase().replace(/\s+/g, '-')}-flag`);
+    
+    const uploadResponse = await fetch(url.toString(), {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${accessToken}`,
+        'Content-Type': 'image/png',
+      },
+      body: flagBuffer,
+    });
+    
+    if (!uploadResponse.ok) {
+      const errorText = await uploadResponse.text();
+      throw new Error(`Flag icon upload failed: ${errorText}`);
+    }
+    
+    const result = await uploadResponse.json();
+    const mediaId = result.displayIcon?.mediaId;
+    
+    if (!mediaId) {
+      throw new Error('No mediaId in upload response');
+    }
+    
+    console.log(`Country flag icon uploaded successfully with mediaId: ${mediaId}`);
+    return mediaId;
+  } catch (error) {
+    console.error('Error uploading country flag icon:', error);
+    return null;
+  }
+}
+
+/**
  * Upload card cover image if available
  * @param {string} accessToken - Yoto API access token
  * @returns {Promise<string|null>} Media URL of uploaded image, or null if no image found

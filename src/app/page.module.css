@@ -619,3 +619,45 @@
     display: none;
   }
 }
+
+/* Send to Yoto Section */
+.sendToYotoSection {
+  margin: 2rem 0;
+  padding: 1.5rem;
+  background: #fff8e1;
+  border: 2px solid #ffd54f;
+  border-radius: 8px;
+  text-align: center;
+}
+
+.devNote {
+  color: #333;
+  margin-bottom: 1rem;
+  line-height: 1.6;
+}
+
+.buttonPrimary {
+  padding: 1rem 2rem;
+  font-size: 1.1rem;
+  background: #ff6b35;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  font-weight: 700;
+  transition: all 0.3s ease;
+  box-shadow: 0 4px 12px rgba(255, 107, 53, 0.3);
+}
+
+.buttonPrimary:hover:not(:disabled) {
+  background: #e55a2b;
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(255, 107, 53, 0.4);
+}
+
+.buttonPrimary:disabled {
+  background: #ccc;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+}

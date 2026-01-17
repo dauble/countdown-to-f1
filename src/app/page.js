@@ -15,6 +15,8 @@ export default function Home() {
   const [pollingJobId, setPollingJobId] = useState(null);
   const [uploadingMyo, setUploadingMyo] = useState(false);
   const [myoResult, setMyoResult] = useState(null);
+  const [sendingToYoto, setSendingToYoto] = useState(false);
+  const [yotoResult, setYotoResult] = useState(null);
 
   // Check authentication status on mount
   useEffect(() => {
@@ -89,15 +91,7 @@ export default function Home() {
       }
 
       setResult(data);
-      
-      // Start polling if we have a jobId
-      if (data.yoto && data.yoto.jobId) {
-        setPollingJobId(data.yoto.jobId);
-        setJobStatus({
-          status: data.yoto.status,
-          progress: data.yoto.progress,
-        });
-      }
+      setYotoResult(null); // Clear previous yoto result when generating new card
     } catch (err) {
       setError(err.message);
     } finally {
@@ -150,6 +144,53 @@ export default function Home() {
     }
   };
 
+  const handleSendToYoto = async () => {
+    if (!result || !result.chapters) {
+      setError('No card data to send. Please generate a card first.');
+      return;
+    }
+
+    setSendingToYoto(true);
+    setError(null);
+    setYotoResult(null);
+
+    try {
+      const response = await fetch('/api/send-to-yoto', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          chapters: result.chapters,
+          title: 'F1: Next Race',
+          updateExisting: true,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        if (data.needsAuth) {
+          throw new Error('Please connect with Yoto first using the button above.');
+        }
+        throw new Error(data.error || 'Failed to send card to Yoto');
+      }
+
+      setYotoResult(data);
+      
+      // Start polling if we have a jobId
+      if (data.yoto && data.yoto.jobId) {
+        setPollingJobId(data.yoto.jobId);
+        setJobStatus({
+          status: data.yoto.status,
+          progress: data.yoto.progress,
+        });
+      }
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setSendingToYoto(false);
+    }
+  };
+
   const handleLogout = async () => {
     try {
       await fetch('/api/auth/logout', { method: 'POST' });
@@ -159,6 +200,8 @@ export default function Home() {
       setError(null);
       setJobStatus(null);
       setPollingJobId(null);
+      setYotoResult(null);
+      setSendingToYoto(false);
     } catch (err) {
       console.error('Logout failed:', err);
     }
@@ -201,81 +244,102 @@ export default function Home() {
               <div className={styles.success}>
                 <h2>✅ {result.message}</h2>
                 
-                {result.yoto && (
-                  <div className={styles.yotoStatus}>
-                    <h3>📱 Yoto Card Status</h3>
-                    {result.isUpdate && (
-                      <p className={styles.updateBadge}>🔄 Updated Existing Card</p>
-                    )}
-                    <p><strong>Job ID:</strong> {result.yoto.jobId}</p>
-                    <p><strong>Status:</strong> {jobStatus ? (
-                      <span>
-                        {jobStatus.status === 'queued' && '⏳ Queued'}
-                        {jobStatus.status === 'processing' && '🔄 Processing'}
-                        {jobStatus.status === 'completed' && '✅ Completed'}
-                        {jobStatus.status === 'failed' && '❌ Failed'}
-                      </span>
-                    ) : result.yoto.status}</p>
-                    {jobStatus && jobStatus.progress && (
-                      <p><strong>Progress:</strong> {jobStatus.progress.completed || 0} / {jobStatus.progress.total || 0} tracks</p>
-                    )}
-                    {jobStatus && jobStatus.status === 'completed' && (
-                      <p className={styles.completedNote}>
-                        ✅ <strong>TTS generation complete!</strong> Your card is ready in your Yoto library.
-                      </p>
-                    )}
-                    {jobStatus && jobStatus.status === 'failed' && (
-                      <p className={styles.failedNote}>
-                        ❌ <strong>TTS generation failed.</strong> Please try again.
-                      </p>
-                    )}
-                    {(!jobStatus || (jobStatus.status !== 'completed' && jobStatus.status !== 'failed')) && (
-                      <p className={styles.statusNote}>
-                        {result.isUpdate 
-                          ? "Your existing card is being updated with the latest race information. The changes will appear in your Yoto library shortly."
-                          : "The card is being processed and will appear in your Yoto library shortly. Future updates will automatically refresh this same card!"}
-                      </p>
-                    )}
+                {!yotoResult && (
+                  <div className={styles.sendToYotoSection}>
+                    <p className={styles.devNote}>
+                      🔧 <strong>Development Mode:</strong> Review the generated content below, then click the button to send to Yoto.
+                    </p>
+                    <button
+                      onClick={handleSendToYoto}
+                      disabled={sendingToYoto}
+                      className={styles.buttonPrimary}
+                    >
+                      {sendingToYoto ? "Sending to Yoto..." : "📤 Send to Yoto"}
+                    </button>
                   </div>
                 )}
 
-                {result.deviceDeployment && (
-                  <div className={styles.deviceDeployment}>
-                    <h3>📡 Device Deployment</h3>
-                    {result.deviceDeployment.error ? (
-                      <p className={styles.deploymentError}>
-                        ⚠️ Could not deploy to devices: {result.deviceDeployment.error}
-                      </p>
-                    ) : (
-                      <>
-                        <p>
-                          <strong>Deployed:</strong> {result.deviceDeployment.success} of {result.deviceDeployment.total} device(s)
-                        </p>
-                        {result.deviceDeployment.failed > 0 && (
-                          <p className={styles.deploymentWarning}>
-                            ⚠️ {result.deviceDeployment.failed} device(s) failed to receive the playlist
+                {yotoResult && (
+                  <>
+                    <div className={styles.yotoStatus}>
+                      <h3>📱 Yoto Card Status</h3>
+                      {yotoResult.isUpdate && (
+                        <p className={styles.updateBadge}>🔄 Updated Existing Card</p>
+                      )}
+                      {yotoResult.yoto && yotoResult.yoto.jobId && (
+                        <>
+                          <p><strong>Job ID:</strong> {yotoResult.yoto.jobId}</p>
+                          <p><strong>Status:</strong> {jobStatus ? (
+                            <span>
+                              {jobStatus.status === 'queued' && '⏳ Queued'}
+                              {jobStatus.status === 'processing' && '🔄 Processing'}
+                              {jobStatus.status === 'completed' && '✅ Completed'}
+                              {jobStatus.status === 'failed' && '❌ Failed'}
+                            </span>
+                          ) : yotoResult.yoto.status}</p>
+                          {jobStatus && jobStatus.progress && (
+                            <p><strong>Progress:</strong> {jobStatus.progress.completed || 0} / {jobStatus.progress.total || 0} tracks</p>
+                          )}
+                          {jobStatus && jobStatus.status === 'completed' && (
+                            <p className={styles.completedNote}>
+                              ✅ <strong>TTS generation complete!</strong> Your card is ready in your Yoto library.
+                            </p>
+                          )}
+                          {jobStatus && jobStatus.status === 'failed' && (
+                            <p className={styles.failedNote}>
+                              ❌ <strong>TTS generation failed.</strong> Please try again.
+                            </p>
+                          )}
+                          {(!jobStatus || (jobStatus.status !== 'completed' && jobStatus.status !== 'failed')) && (
+                            <p className={styles.statusNote}>
+                              {yotoResult.isUpdate 
+                                ? "Your existing card is being updated with the latest race information. The changes will appear in your Yoto library shortly."
+                                : "The card is being processed and will appear in your Yoto library shortly. Future updates will automatically refresh this same card!"}
+                            </p>
+                          )}
+                        </>
+                      )}
+                    </div>
+
+                    {yotoResult.deviceDeployment && (
+                      <div className={styles.deviceDeployment}>
+                        <h3>📡 Device Deployment</h3>
+                        {yotoResult.deviceDeployment.error ? (
+                          <p className={styles.deploymentError}>
+                            ⚠️ Could not deploy to devices: {yotoResult.deviceDeployment.error}
                           </p>
+                        ) : (
+                          <>
+                            <p>
+                              <strong>Deployed:</strong> {yotoResult.deviceDeployment.success} of {yotoResult.deviceDeployment.total} device(s)
+                            </p>
+                            {yotoResult.deviceDeployment.failed > 0 && (
+                              <p className={styles.deploymentWarning}>
+                                ⚠️ {yotoResult.deviceDeployment.failed} device(s) failed to receive the playlist
+                              </p>
+                            )}
+                            {yotoResult.deviceDeployment.total === 0 && (
+                              <p className={styles.deploymentNote}>
+                                ℹ️ No devices found. The playlist is in your library and can be played on any device.
+                              </p>
+                            )}
+                            {yotoResult.deviceDeployment.success > 0 && (
+                              <p className={styles.deploymentSuccess}>
+                                ✅ Playlist has been sent to your device(s) and should start playing shortly!
+                              </p>
+                            )}
+                          </>
                         )}
-                        {result.deviceDeployment.total === 0 && (
-                          <p className={styles.deploymentNote}>
-                            ℹ️ No devices found. The playlist is in your library and can be played on any device.
-                          </p>
-                        )}
-                        {result.deviceDeployment.success > 0 && (
-                          <p className={styles.deploymentSuccess}>
-                            ✅ Playlist has been sent to your device(s) and should start playing shortly!
-                          </p>
-                        )}
-                      </>
+                      </div>
                     )}
-                  </div>
+                  </>
                 )}
                 
                 <div className={styles.f1Info}>
-                  <h3>🏁 Next Race</h3>
+                  <h3>🏁 Next Session</h3>
                   <div className={styles.raceInfo}>
-                    <p><strong>Race:</strong> {result.race.name}</p>
-                    <p><strong>Location:</strong> {result.race.location}</p>
+                    <p><strong>Name:</strong> {result.race.name}</p>
+                    <p><strong>Location:</strong> {result.race.location}, {result.race.country}</p>
                     <p><strong>Circuit:</strong> {result.race.circuit}</p>
                     <p><strong>Date:</strong> {result.race.date}</p>
                     <p><strong>Time:</strong> {result.race.time}</p>
@@ -283,9 +347,9 @@ export default function Home() {
                 </div>
 
                 <details className={styles.scriptPreview}>
-                  <summary>📝 View Generated Content ({result.yoto?.chapters?.length || 0} chapters)</summary>
+                  <summary>📝 View Generated Content ({result.chapters?.length || 0} chapters)</summary>
                   <div className={styles.chapters}>
-                    {result.yoto?.chapters?.map((chapter, index) => (
+                    {result.chapters?.map((chapter, index) => (
                       <div key={index} className={styles.chapter}>
                         <h4>
                           {chapter.icon && '🏎️ '} 
@@ -301,7 +365,7 @@ export default function Home() {
                         ))}
                       </div>
                     ))}
-                    {(!result.yoto?.chapters || result.yoto.chapters.length === 0) && result.script && (
+                    {(!result.chapters || result.chapters.length === 0) && result.script && (
                       <>
                         <div className={styles.chapter}>
                           <h4>Chapter 1: Next Race</h4>
@@ -323,24 +387,6 @@ export default function Home() {
                     )}
                   </div>
                 </details>
-                
-                {(result.meetingDetails || result.weather) && (
-                  <details className={styles.debugSection}>
-                    <summary>🔍 Enhanced Race Data (Debug)</summary>
-                    {result.meetingDetails && (
-                      <div className={styles.debugInfo}>
-                        <h4>🏟️ Meeting Details</h4>
-                        <pre>{JSON.stringify(result.meetingDetails, null, 2)}</pre>
-                      </div>
-                    )}
-                    {result.weather && (
-                      <div className={styles.debugInfo}>
-                        <h4>🌤️ Weather Data</h4>
-                        <pre>{JSON.stringify(result.weather, null, 2)}</pre>
-                      </div>
-                    )}
-                  </details>
-                )}
               </div>
             )}
 

@@ -1,7 +1,7 @@
 // API Route to generate a Formula 1 card
 import { getNextRace, getUpcomingSessions, getDriverStandings, getTeamStandings, generateF1Script, getMeetingDetails, getSessionWeather } from "@/services/f1Service";
 import { createTextToSpeechPlaylist, buildF1Chapters, deployToAllDevices } from "@/services/yotoService";
-import { uploadCardCoverImage, uploadCardIcon } from "@/utils/imageUtils";
+import { uploadCardCoverImage, uploadCardIcon, uploadCountryFlagIcon } from "@/utils/imageUtils";
 import Configstore from "configstore";
 
 // Delay utility to respect OpenF1 API rate limit (3 requests/second)
@@ -187,66 +187,26 @@ export async function POST(request) {
     // Step 7: Upload custom icon if available (16x16 for display on Yoto device)
     const iconMediaId = await uploadCardIcon(accessToken);
 
+    // Step 7a: Upload country flag as icon for first chapter if available
+    let countryFlagIconId = null;
+    if (raceData.countryFlag) {
+      countryFlagIconId = await uploadCountryFlagIcon(raceData.countryFlag, accessToken, raceData.country);
+    }
+
     // Step 8: Build chapters for Yoto playlist with custom icon, sessions, and enhanced details
-    const chapters = buildF1Chapters(raceData, sessions, iconMediaId, meetingDetails, weather);
+    const chapters = buildF1Chapters(raceData, sessions, iconMediaId, meetingDetails, weather, countryFlagIconId);
 
-    // Step 9: Check if we should update existing card
-    const existingCardId = shouldUpdate ? getStoredCardId() : null;
-    
-    // Step 10: Upload cover image if available
-    const coverImageUrl = await uploadCardCoverImage(accessToken);
-    
-    // Step 11: Create or update the Yoto card with TTS
-    const title = `F1: Next Race`;
-    const yotoResult = await createTextToSpeechPlaylist({
-      title,
-      chapters,
-      accessToken,
-      cardId: existingCardId,
-      coverImageUrl,
-    });
-
-    // Store the card ID if it's a new card
-    if (yotoResult.cardId && !existingCardId) {
-      storeCardId(yotoResult.cardId);
-    }
-
-    // Step 12: Deploy the playlist to all devices
-    let deviceDeployment = null;
-    if (yotoResult.cardId) {
-      try {
-        deviceDeployment = await deployToAllDevices(yotoResult.cardId, accessToken);
-        console.log(`Device deployment: ${deviceDeployment.success}/${deviceDeployment.total} successful`);
-      } catch (deployError) {
-        console.error('Failed to deploy to devices:', deployError);
-        // Don't fail the entire request if device deployment fails
-        deviceDeployment = {
-          success: 0,
-          failed: 0,
-          total: 0,
-          error: deployError.message,
-        };
-      }
-    }
-
-    // Step 13: Return success with job information
+    // Step 9: Return success with generated data (not sent to Yoto yet)
     return Response.json({
       success: true,
       race: raceData,
       drivers: driverStandings,
       teams: teamStandings,
       script,
-      yoto: {
-        ...yotoResult,
-        chapters, // Include chapters data so UI can display all content
-      },
-      deviceDeployment,
-      isUpdate: !!existingCardId,
+      chapters, // Include chapters data so UI can display and send to Yoto
       meetingDetails, // Include for debugging
       weather, // Include for debugging
-      message: existingCardId 
-        ? "Formula 1 card updated successfully! Changes will appear in your Yoto library shortly."
-        : "Formula 1 card created successfully! Check your Yoto library.",
+      message: "Formula 1 card data generated successfully! Review the content and click 'Send to Yoto' when ready.",
     });
 
   } catch (error) {

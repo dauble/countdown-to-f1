@@ -38,9 +38,9 @@ export async function getNextRace() {
     const currentYear = new Date().getFullYear();
     const now = new Date().toISOString();
     
-    // Get all race sessions for the current year, ordered by date
+    // Get all meetings for the current year, ordered by date
     const response = await fetch(
-      `${F1_API_BASE}/sessions?session_name=Race&year=${currentYear}&date_start>=${now.split('T')[0]}`,
+      `${F1_API_BASE}/meetings?year=${currentYear}&date_start>=${now.split('T')[0]}`,
       { signal: AbortSignal.timeout(5000) }
     );
 
@@ -50,13 +50,13 @@ export async function getNextRace() {
       throw new Error("Failed to fetch race data");
     }
 
-    const sessions = await response.json();
+    const meetings = await response.json();
     
-    if (!sessions || sessions.length === 0) {
+    if (!meetings || meetings.length === 0) {
       // If no future races this year, try next year
       const nextYear = currentYear + 1;
       const nextYearResponse = await fetch(
-        `${F1_API_BASE}/sessions?session_name=Race&year=${nextYear}`,
+        `${F1_API_BASE}/meetings?year=${nextYear}`,
         { signal: AbortSignal.timeout(5000) }
       );
       
@@ -64,16 +64,16 @@ export async function getNextRace() {
         throw new Error("No upcoming races found");
       }
       
-      const nextYearSessions = await nextYearResponse.json();
-      if (!nextYearSessions || nextYearSessions.length === 0) {
+      const nextYearMeetings = await nextYearResponse.json();
+      if (!nextYearMeetings || nextYearMeetings.length === 0) {
         throw new Error("No upcoming races found");
       }
       
-      return formatRaceData(nextYearSessions[0]);
+      return formatRaceData(nextYearMeetings[0]);
     }
     
-    // Return the first (earliest) race
-    return formatRaceData(sessions[0]);
+    // Return the first (earliest) meeting
+    return formatRaceData(meetings[0]);
   } catch (error) {
     console.log("Using mock race data due to API error:", error.message);
     return MOCK_DATA.nextRace;
@@ -109,12 +109,14 @@ export async function getUpcomingSessions(meetingKey) {
     return sessions
       .sort((a, b) => new Date(a.date_start) - new Date(b.date_start))
       .map(session => ({
-        sessionName: session.session_name,
+        meetingName: session.meeting_name || session.location, // The overall event name (e.g., "Singapore Grand Prix")
+        sessionName: session.session_name, // Specific session (e.g., "Practice 1", "Qualifying", "Race")
         sessionType: session.session_type,
         dateStart: session.date_start,
         dateEnd: session.date_end,
         location: session.location,
         circuitName: session.circuit_short_name,
+        sessionKey: session.session_key,
       }));
   } catch (error) {
     console.log("Error fetching sessions:", error.message);
@@ -289,17 +291,22 @@ export async function getTeamStandings() {
 /**
  * Format race data for display
  */
-function formatRaceData(session) {
+function formatRaceData(meeting) {
   // Don't format date/time here - let generate-card route handle timezone conversion
   return {
-    name: session.meeting_name || session.location || "Formula 1 Race",
-    location: session.location || session.country_name || "Unknown Location",
-    circuit: session.circuit_short_name || session.circuit_key || "Unknown Circuit",
-    dateStart: session.date_start, // ISO date for timezone conversion in API route
+    name: meeting.meeting_name || "Formula 1 Race",
+    officialName: meeting.meeting_official_name || meeting.meeting_name,
+    location: meeting.location || "Unknown Location",
+    country: meeting.country_name || "Unknown Country",
+    circuit: meeting.circuit_short_name || "Unknown Circuit",
+    circuitType: meeting.circuit_type || "Unknown",
+    countryFlag: meeting.country_flag || null, // URL to country flag image
+    dateStart: meeting.date_start, // ISO date for timezone conversion in API route
+    dateEnd: meeting.date_end,
     date: null, // Will be set by API route with user's timezone
     time: null, // Will be set by API route with user's timezone
-    year: session.year,
-    meetingKey: session.meeting_key // Needed to fetch all sessions for this meeting
+    year: meeting.year,
+    meetingKey: meeting.meeting_key // Needed to fetch all sessions for this meeting
   };
 }
 
@@ -308,15 +315,28 @@ function formatRaceData(session) {
  */
 export function generateF1Script(raceData, driverStandings, teamStandings) {
   // Chapter 1: Next Race
+  // Build circuit type description
+  const circuitTypeDesc = raceData.circuitType 
+    ? raceData.circuitType === "Permanent" 
+      ? "a permanent racing circuit"
+      : raceData.circuitType === "Temporary - Street"
+      ? "a temporary street circuit"
+      : raceData.circuitType === "Temporary - Road"
+      ? "a temporary road course"
+      : "a racing circuit"
+    : "a racing circuit";
+
   const chapter1 = `Chapter 1: Next Race
 
 Hello Formula 1 fans! Let me tell you about the next race in the ${raceData.year} season.
 
-The next race is the ${raceData.name}, taking place in ${raceData.location}.
+The next race is the ${raceData.name}, taking place in ${raceData.location}, ${raceData.country}.
 
-The race will be held on ${raceData.date}, at ${raceData.time}.
+The drivers will be racing at the ${raceData.circuit} circuit, which is ${circuitTypeDesc}.
 
-Get ready for an exciting race at ${raceData.circuit}!`;
+The race weekend begins on ${raceData.date}, with the main race at ${raceData.time}.
+
+Get ready for an exciting race weekend!`;
 
   // Chapter 2: Driver Standings
   const driversList = driverStandings
