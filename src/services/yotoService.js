@@ -325,27 +325,92 @@ export async function deployToAllDevices(cardId, accessToken) {
  * @param {Object} raceData - Race information
  * @param {Array} sessions - Array of session objects (Practice, Qualifying, Sprint, Race, etc.)
  * @param {string|null} iconMediaId - Optional custom icon media ID (from uploadCardIcon)
+ * @param {Object|null} meetingDetails - Optional meeting details (country, circuit type, official name)
+ * @param {Object|null} weather - Optional weather data (temperature, humidity, wind, rainfall)
  * @returns {Array} Array of chapter objects
  */
-export function buildF1Chapters(raceData, sessions = [], iconMediaId = null) {
+export function buildF1Chapters(raceData, sessions = [], iconMediaId = null, meetingDetails = null, weather = null) {
   const chapters = [];
   
-  console.log(`Building F1 chapters with ${sessions.length} sessions and iconMediaId: ${iconMediaId || 'none'}`);
+  console.log(`Building F1 chapters with ${sessions.length} sessions, iconMediaId: ${iconMediaId || 'none'}, meeting details: ${meetingDetails ? 'yes' : 'no'}, weather: ${weather ? 'yes' : 'no'}`);
   
-  // Chapter 1: Overall race weekend information
+  // Build enhanced overview text with meeting and weather details
+  let overviewText = `Hello Formula 1 fans! Let me tell you about the upcoming ${raceData.name} in the ${raceData.year} season.`;
+
+  // Add meeting details if available
+  if (meetingDetails) {
+    // Use meetingName for the circuit name (better than circuitShortName)
+    const circuitName = meetingDetails.meetingName || raceData.circuit;
+    const location = meetingDetails.countryName || raceData.location;
+    
+    overviewText += `\n\nThis race weekend takes place in ${location} at ${circuitName}.`;
+    
+    if (meetingDetails.meetingOfficialName && meetingDetails.meetingOfficialName !== raceData.name) {
+      overviewText += ` The official name of this event is the ${meetingDetails.meetingOfficialName}.`;
+    }
+    
+    if (meetingDetails.circuitType) {
+      const circuitTypeDescription = meetingDetails.circuitType === "Permanent" 
+        ? "a permanent racing circuit"
+        : meetingDetails.circuitType === "Temporary - Street"
+        ? "a temporary street circuit"
+        : meetingDetails.circuitType === "Temporary - Road"
+        ? "a temporary road circuit"
+        : "a racing circuit";
+      
+      overviewText += ` ${circuitName} is ${circuitTypeDescription}.`;
+    }
+  } else {
+    // Fallback if no meeting details
+    overviewText += `\n\nThis race weekend takes place in ${raceData.location} at ${raceData.circuit}.`;
+  }
+
+  overviewText += `\n\nThe race is scheduled for ${raceData.date} at ${raceData.time}.`;
+
+  // Add weather information if available
+  if (weather) {
+    overviewText += `\n\nLet me tell you about the weather conditions at the track.`;
+    
+    if (weather.airTemperature !== undefined) {
+      overviewText += ` The air temperature is ${Math.round(weather.airTemperature)} degrees Celsius.`;
+    }
+    
+    if (weather.trackTemperature !== undefined) {
+      overviewText += ` The track temperature is ${Math.round(weather.trackTemperature)} degrees Celsius.`;
+    }
+    
+    if (weather.humidity !== undefined) {
+      overviewText += ` The humidity level is at ${Math.round(weather.humidity)} percent.`;
+    }
+    
+    if (weather.windSpeed !== undefined && weather.windSpeed > 0) {
+      const windDescription = weather.windSpeed < 10 
+        ? "light winds of"
+        : weather.windSpeed < 20
+        ? "moderate winds of"
+        : "strong winds of";
+      overviewText += ` There are ${windDescription} ${Math.round(weather.windSpeed)} kilometers per hour.`;
+    }
+    
+    if (weather.rainfall !== undefined && weather.rainfall > 0) {
+      overviewText += ` Drivers will need to navigate wet conditions as there is rainfall at the circuit.`;
+    } else if (weather.rainfall !== undefined) {
+      overviewText += ` The track is dry with no rainfall, perfect for racing!`;
+    }
+  }
+
+  if (sessions.length > 0) {
+    overviewText += `\n\nThere are ${sessions.length} sessions scheduled for this race weekend. Listen to the following chapters to learn about each session!`;
+  }
+  
+  // Chapter 1: Overall race weekend information with enhanced details
   chapters.push({
     title: "Race Weekend Overview",
     icon: iconMediaId ? `yoto:#${iconMediaId}` : null,
     tracks: [
       {
         title: raceData.name,
-        text: `Hello Formula 1 fans! Let me tell you about the upcoming ${raceData.name} in the ${raceData.year} season.
-
-This race weekend takes place in ${raceData.location} at the ${raceData.circuit}.
-
-The race is scheduled for ${raceData.date} at ${raceData.time}.
-
-There are ${sessions.length} sessions scheduled for this race weekend. Listen to the following chapters to learn about each session!`,
+        text: overviewText,
         icon: iconMediaId ? `yoto:#${iconMediaId}` : null,
       }
     ]

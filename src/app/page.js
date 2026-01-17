@@ -323,6 +323,24 @@ export default function Home() {
                     )}
                   </div>
                 </details>
+                
+                {(result.meetingDetails || result.weather) && (
+                  <details className={styles.debugSection}>
+                    <summary>🔍 Enhanced Race Data (Debug)</summary>
+                    {result.meetingDetails && (
+                      <div className={styles.debugInfo}>
+                        <h4>🏟️ Meeting Details</h4>
+                        <pre>{JSON.stringify(result.meetingDetails, null, 2)}</pre>
+                      </div>
+                    )}
+                    {result.weather && (
+                      <div className={styles.debugInfo}>
+                        <h4>🌤️ Weather Data</h4>
+                        <pre>{JSON.stringify(result.weather, null, 2)}</pre>
+                      </div>
+                    )}
+                  </details>
+                )}
               </div>
             )}
 

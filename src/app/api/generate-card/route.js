@@ -1,8 +1,11 @@
 // API Route to generate a Formula 1 card
-import { getNextRace, getUpcomingSessions, getDriverStandings, getTeamStandings, generateF1Script } from "@/services/f1Service";
+import { getNextRace, getUpcomingSessions, getDriverStandings, getTeamStandings, generateF1Script, getMeetingDetails, getSessionWeather } from "@/services/f1Service";
 import { createTextToSpeechPlaylist, buildF1Chapters, deployToAllDevices } from "@/services/yotoService";
 import { uploadCardCoverImage, uploadCardIcon } from "@/utils/imageUtils";
 import Configstore from "configstore";
+
+// Delay utility to respect OpenF1 API rate limit (3 requests/second)
+const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
 const config = new Configstore("yoto-f1-card-tokens");
 
@@ -83,12 +86,15 @@ export async function POST(request) {
     // Step 2: Get user's timezone
     const userTimezone = await getUserTimezone(request);
     
-    // Step 3: Fetch F1 data from API
-    const [raceData, driverStandings, teamStandings] = await Promise.all([
-      getNextRace(),
-      getDriverStandings(),
-      getTeamStandings()
-    ]);
+    // Step 3: Fetch F1 data from API (sequential to respect 3 req/sec rate limit)
+    const raceData = await getNextRace();
+    await delay(400); // Wait 400ms between requests (allows 2.5 req/sec safely)
+    
+    const driverStandings = await getDriverStandings();
+    await delay(400);
+    
+    const teamStandings = await getTeamStandings();
+    await delay(400);
 
     // Step 4: Convert race time to user's timezone
     if (raceData.dateStart) {
@@ -150,19 +156,47 @@ export async function POST(request) {
     // Step 5: Generate script for text-to-speech
     const script = generateF1Script(raceData, driverStandings, teamStandings);
 
-    // Step 6: Upload custom icon if available (16x16 for display on Yoto device)
+    // Step 6: Fetch additional race details (meeting info and weather)
+    // Continue respecting OpenF1 rate limit
+    let meetingDetails = null;
+    let weather = null;
+    
+    if (raceData.meetingKey) {
+      try {
+        console.log(`Fetching meeting details for meetingKey: ${raceData.meetingKey}`);
+        meetingDetails = await getMeetingDetails(raceData.meetingKey);
+        console.log('Meeting details fetched:', meetingDetails);
+        await delay(400); // Rate limit protection
+      } catch (error) {
+        console.error('Failed to fetch meeting details:', error.message);
+      }
+    }
+    
+    // Get weather from the first session if available
+    if (sessions.length > 0 && sessions[0].sessionKey) {
+      try {
+        console.log(`Fetching weather for sessionKey: ${sessions[0].sessionKey}`);
+        weather = await getSessionWeather(sessions[0].sessionKey);
+        console.log('Weather data fetched:', weather);
+        await delay(400); // Rate limit protection
+      } catch (error) {
+        console.error('Failed to fetch weather data:', error.message);
+      }
+    }
+
+    // Step 7: Upload custom icon if available (16x16 for display on Yoto device)
     const iconMediaId = await uploadCardIcon(accessToken);
 
-    // Step 7: Build chapters for Yoto playlist with custom icon and sessions
-    const chapters = buildF1Chapters(raceData, sessions, iconMediaId);
+    // Step 8: Build chapters for Yoto playlist with custom icon, sessions, and enhanced details
+    const chapters = buildF1Chapters(raceData, sessions, iconMediaId, meetingDetails, weather);
 
-    // Step 8: Check if we should update existing card
+    // Step 9: Check if we should update existing card
     const existingCardId = shouldUpdate ? getStoredCardId() : null;
     
-    // Step 9: Upload cover image if available
+    // Step 10: Upload cover image if available
     const coverImageUrl = await uploadCardCoverImage(accessToken);
     
-    // Step 10: Create or update the Yoto card with TTS
+    // Step 11: Create or update the Yoto card with TTS
     const title = `F1: Next Race`;
     const yotoResult = await createTextToSpeechPlaylist({
       title,
@@ -177,7 +211,7 @@ export async function POST(request) {
       storeCardId(yotoResult.cardId);
     }
 
-    // Step 11: Deploy the playlist to all devices
+    // Step 12: Deploy the playlist to all devices
     let deviceDeployment = null;
     if (yotoResult.cardId) {
       try {
@@ -195,7 +229,7 @@ export async function POST(request) {
       }
     }
 
-    // Step 12: Return success with job information
+    // Step 13: Return success with job information
     return Response.json({
       success: true,
       race: raceData,
@@ -208,6 +242,8 @@ export async function POST(request) {
       },
       deviceDeployment,
       isUpdate: !!existingCardId,
+      meetingDetails, // Include for debugging
+      weather, // Include for debugging
       message: existingCardId 
         ? "Formula 1 card updated successfully! Changes will appear in your Yoto library shortly."
         : "Formula 1 card created successfully! Check your Yoto library.",

@@ -355,3 +355,95 @@ Thank you for listening! Enjoy the racing!`;
     full: `${chapter1}\n\n${chapter2}\n\n${chapter3}`
   };
 }
+
+/**
+ * Get detailed meeting information
+ * @param {number} meetingKey - The meeting key
+ * @returns {Promise<Object|null>} Meeting details or null
+ */
+export async function getMeetingDetails(meetingKey) {
+  try {
+    const url = `${F1_API_BASE}/meetings?meeting_key=${meetingKey}`;
+    console.log('Fetching meeting details from:', url);
+    
+    const response = await fetch(url, { signal: AbortSignal.timeout(5000) });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error(`Meeting details API error: ${response.status} ${response.statusText}`, errorText);
+      throw new Error(`Failed to fetch meeting details: ${response.status}`);
+    }
+
+    const meetings = await response.json();
+    console.log('Meeting details response:', meetings);
+    
+    if (!meetings || meetings.length === 0) {
+      console.warn('No meeting details found for meeting key:', meetingKey);
+      return null;
+    }
+    
+    const meeting = meetings[0];
+    
+    return {
+      meetingName: meeting.meeting_name,
+      meetingOfficialName: meeting.meeting_official_name,
+      location: meeting.location,
+      countryName: meeting.country_name,
+      countryCode: meeting.country_code,
+      circuitShortName: meeting.circuit_short_name,
+      circuitKey: meeting.circuit_key,
+      circuitType: meeting.circuit_type, // "Permanent", "Temporary - Street", "Temporary - Road"
+      year: meeting.year,
+      gmtOffset: meeting.gmt_offset,
+    };
+  } catch (error) {
+    console.error("Error fetching meeting details:", error.message, error);
+    return null;
+  }
+}
+
+/**
+ * Get current weather conditions at the track
+ * @param {number} sessionKey - The session key to get weather for
+ * @returns {Promise<Object|null>} Weather data or null
+ */
+export async function getSessionWeather(sessionKey) {
+  try {
+    // Get the most recent weather reading for this session
+    const url = `${F1_API_BASE}/weather?session_key=${sessionKey}`;
+    console.log('Fetching weather from:', url);
+    
+    const response = await fetch(url, { signal: AbortSignal.timeout(5000) });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error(`Weather API error: ${response.status} ${response.statusText}`, errorText);
+      throw new Error(`Failed to fetch weather data: ${response.status}`);
+    }
+
+    const weatherData = await response.json();
+    console.log('Weather data response:', weatherData);
+    
+    if (!weatherData || weatherData.length === 0) {
+      console.warn('No weather data found for session key:', sessionKey);
+      return null;
+    }
+    
+    // Get the most recent weather reading
+    const latestWeather = weatherData[weatherData.length - 1];
+    
+    return {
+      airTemperature: latestWeather.air_temperature,
+      trackTemperature: latestWeather.track_temperature,
+      humidity: latestWeather.humidity,
+      pressure: latestWeather.pressure,
+      rainfall: latestWeather.rainfall,
+      windSpeed: latestWeather.wind_speed,
+      windDirection: latestWeather.wind_direction,
+      date: latestWeather.date,
+    };
+  } catch (error) {
+    console.error("Error fetching weather data:", error.message, error);
+    return null;
+  }
+}
