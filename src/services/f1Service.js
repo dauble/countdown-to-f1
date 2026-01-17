@@ -1,6 +1,8 @@
 // Formula 1 API Service using OpenF1
 // API Documentation: https://openf1.org/
 
+import { getCircuitTypeDescription } from "@/utils/circuitUtils";
+
 const F1_API_BASE = "https://api.openf1.org/v1";
 
 // Mock data for when API is unavailable
@@ -316,15 +318,7 @@ function formatRaceData(meeting) {
 export function generateF1Script(raceData, driverStandings, teamStandings) {
   // Chapter 1: Next Race
   // Build circuit type description
-  const circuitTypeDesc = raceData.circuitType 
-    ? raceData.circuitType === "Permanent" 
-      ? "a permanent racing circuit"
-      : raceData.circuitType === "Temporary - Street"
-      ? "a temporary street circuit"
-      : raceData.circuitType === "Temporary - Road"
-      ? "a temporary road course"
-      : "a racing circuit"
-    : "a racing circuit";
+  const circuitTypeDesc = getCircuitTypeDescription(raceData.circuitType) || "a racing circuit";
 
   const chapter1 = `Chapter 1: Next Race
 

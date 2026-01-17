@@ -1,6 +1,8 @@
 // Yoto API Service for creating MYO cards
 // API Documentation: https://yoto.dev/myo/labs-tts/
 
+import { getCircuitTypeDescription } from "@/utils/circuitUtils";
+
 const YOTO_LABS_API_BASE = "https://labs.api.yotoplay.com";
 const YOTO_API_BASE = "https://api.yotoplay.com";
 const DEFAULT_VOICE_ID = "JBFqnCBsd6RMkjVDRZzb"; // ElevenLabs voice ID
@@ -322,18 +324,17 @@ export async function deployToAllDevices(cardId, accessToken) {
 
 /**
  * Convert F1 race data into Yoto chapter format with multiple chapters for each session
- * @param {Object} raceData - Race information
+ * @param {Object} raceData - Race information (includes country, circuit type, official name)
  * @param {Array} sessions - Array of session objects (Practice, Qualifying, Sprint, Race, etc.)
  * @param {string|null} iconMediaId - Optional custom icon media ID (from uploadCardIcon)
- * @param {Object|null} meetingDetails - Optional meeting details (country, circuit type, official name)
  * @param {Object|null} weather - Optional weather data (temperature, humidity, wind, rainfall)
  * @param {string|null} countryFlagIconId - Optional country flag icon media ID for first chapter
  * @returns {Array} Array of chapter objects
  */
-export function buildF1Chapters(raceData, sessions = [], iconMediaId = null, meetingDetails = null, weather = null, countryFlagIconId = null) {
+export function buildF1Chapters(raceData, sessions = [], iconMediaId = null, weather = null, countryFlagIconId = null) {
   const chapters = [];
   
-  console.log(`Building F1 chapters with ${sessions.length} sessions, iconMediaId: ${iconMediaId || 'none'}, meeting details: ${meetingDetails ? 'yes' : 'no'}, weather: ${weather ? 'yes' : 'no'}`);
+  console.log(`Building F1 chapters with ${sessions.length} sessions, iconMediaId: ${iconMediaId || 'none'}, weather: ${weather ? 'yes' : 'no'}, countryFlagIconId: ${countryFlagIconId || 'none'}`);
   
   // Build enhanced overview text with meeting and weather details
   let overviewText = `Hello Formula 1 fans! Let me tell you about the upcoming ${raceData.name} in the ${raceData.year} season.`;
@@ -346,15 +347,8 @@ export function buildF1Chapters(raceData, sessions = [], iconMediaId = null, mee
   overviewText += `\n\nThis race weekend takes place in ${location}.`;
   
   // Add circuit information with type
-  if (raceData.circuitType) {
-    const circuitTypeDescription = raceData.circuitType === "Permanent" 
-      ? "a permanent racing circuit"
-      : raceData.circuitType === "Temporary - Street"
-      ? "a temporary street circuit"
-      : raceData.circuitType === "Temporary - Road"
-      ? "a temporary road circuit"
-      : "a racing circuit";
-    
+  const circuitTypeDescription = getCircuitTypeDescription(raceData.circuitType);
+  if (circuitTypeDescription) {
     overviewText += ` The drivers will be racing at the ${raceData.circuit} circuit, which is ${circuitTypeDescription}.`;
   } else {
     overviewText += ` The drivers will be racing at the ${raceData.circuit} circuit.`;

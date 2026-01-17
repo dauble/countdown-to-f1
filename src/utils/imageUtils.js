@@ -91,7 +91,10 @@ export async function uploadCountryFlagIcon(flagUrl, accessToken, countryName = 
 
     const flagBuffer = Buffer.from(await flagResponse.arrayBuffer());
     
-    console.log(`Downloaded flag (${flagBuffer.length} bytes), uploading to Yoto...`);
+    // Get content type from response headers, fallback to image/png
+    const contentType = flagResponse.headers.get('content-type') || 'image/png';
+    
+    console.log(`Downloaded flag (${flagBuffer.length} bytes, ${contentType}), uploading to Yoto...`);
     
     // Upload flag as icon to Yoto with autoConvert to resize to 16x16
     const url = new URL('https://api.yotoplay.com/media/displayIcons/user/me/upload');
@@ -102,7 +105,7 @@ export async function uploadCountryFlagIcon(flagUrl, accessToken, countryName = 
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${accessToken}`,
-        'Content-Type': 'image/png',
+        'Content-Type': contentType,
       },
       body: flagBuffer,
     });

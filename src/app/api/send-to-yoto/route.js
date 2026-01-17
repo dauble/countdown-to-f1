@@ -1,34 +1,7 @@
 // API Route to send generated card data to Yoto
 import { createTextToSpeechPlaylist, deployToAllDevices } from "@/services/yotoService";
 import { uploadCardCoverImage } from "@/utils/imageUtils";
-import Configstore from "configstore";
-
-const config = new Configstore("yoto-f1-card-tokens");
-
-/**
- * Get stored access token
- */
-function getAccessToken() {
-  const tokens = config.get("tokens");
-  if (!tokens || !tokens.accessToken) {
-    return null;
-  }
-  return tokens.accessToken;
-}
-
-/**
- * Get stored card ID for updates
- */
-function getStoredCardId() {
-  return config.get("f1CardId");
-}
-
-/**
- * Store card ID for future updates
- */
-function storeCardId(cardId) {
-  config.set("f1CardId", cardId);
-}
+import { getAccessToken, getStoredCardId, storeCardId, isAuthError, createAuthErrorResponse } from "@/utils/authUtils";
 
 export async function POST(request) {
   try {
@@ -107,20 +80,8 @@ export async function POST(request) {
   } catch (error) {
     console.error("Send to Yoto error:", error);
     
-    // Check if it's an auth error
-    const isAuthError = 
-      error.status === 401 ||
-      (error.message && typeof error.message === 'string' && 
-       (error.message.includes('401') || error.message.toLowerCase().includes('unauthorized')));
-    
-    if (isAuthError) {
-      return Response.json(
-        {
-          error: "Authentication failed. Please reconnect with Yoto.",
-          needsAuth: true,
-        },
-        { status: 401 }
-      );
+    if (isAuthError(error)) {
+      return createAuthErrorResponse();
     }
     
     return Response.json(
