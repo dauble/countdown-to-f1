@@ -321,9 +321,7 @@ export function generateF1Script(raceData, driverStandings, teamStandings) {
   const circuitTypeDesc = getCircuitTypeDescription(raceData.circuitType);
   
   // Build circuit description - only include type if known
-  const circuitDescription = circuitTypeDesc 
-    ? `The drivers will be racing at the ${raceData.circuit} circuit, which is ${circuitTypeDesc}.`
-    : `The drivers will be racing at the ${raceData.circuit} circuit.`;
+  const circuitDescription = `The drivers will be racing at the ${raceData.circuit} circuit${circuitTypeDesc ? ', which is ' + circuitTypeDesc : ''}.`;
 
   const chapter1 = `Chapter 1: Next Race
 
