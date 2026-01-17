@@ -122,5 +122,5 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Release Links
 
-- [v1.1.0](https://github.com/yourusername/yoto-f1-card/releases/tag/v1.1.0) - OAuth fixes and auto-deployment
-- [v1.0.0](https://github.com/yourusername/yoto-f1-card/releases/tag/v1.0.0) - Initial release
+- [v1.1.0](https://github.com/dauble/yoto-app/releases/tag/v1.1.0) - OAuth fixes and auto-deployment
+- [v1.0.0](https://github.com/dauble/yoto-app/releases/tag/v1.0.0) - Initial release

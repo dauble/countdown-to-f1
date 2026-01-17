@@ -260,7 +260,7 @@ Contributions are welcome! Please read [CONTRIBUTING.md](documentation/CONTRIBUT
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
-## � Documentation
+## 📝 Documentation
 
 - [Quick Start Guide](documentation/QUICKSTART.md) - Get up and running in 5 minutes
 - [Changelog](documentation/CHANGELOG.md) - Version history and release notes
@@ -270,7 +270,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 - [MYO Upload Feature](documentation/MYO_UPLOAD_FEATURE.md) - Audio file upload guide
 - [Contributing Guide](documentation/CONTRIBUTING.md) - How to contribute to the project
 
-## �🙏 Acknowledgments
+## 🙏 Acknowledgments
 
 - [Yoto](https://yoto.dev/) for their amazing developer API
 - [OpenF1](https://openf1.org/) for F1 data

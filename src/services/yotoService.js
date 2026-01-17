@@ -352,8 +352,7 @@ There are ${sessions.length} sessions scheduled for this race weekend. Listen to
   });
   
   // Add a chapter for each session
-  sessions.forEach((session, index) => {
-    const sessionNumber = index + 1;
+  sessions.forEach((session) => {
     const sessionText = generateSessionText(session, raceData);
     
     chapters.push({
@@ -403,11 +402,16 @@ Get ready for an exciting race at ${raceData.circuit}!`,
 function generateSessionText(session, raceData) {
   const sessionType = session.sessionType || session.sessionName;
   
+  // Format schedule information with fallback
+  const scheduleText = (session.date && session.time) 
+    ? `Scheduled for ${session.date} at ${session.time}.`
+    : 'Schedule to be confirmed.';
+  
   // Customize text based on session type
   if (sessionType.toLowerCase().includes('practice')) {
     return `This is ${session.sessionName} for the ${raceData.name}.
 
-Scheduled for ${session.date} at ${session.time}.
+${scheduleText}
 
 Practice sessions give teams the opportunity to fine-tune their car setups and drivers to learn the track. Teams will test different tire compounds and aerodynamic configurations to find the optimal balance between speed and reliability.
 
@@ -417,7 +421,7 @@ Watch for lap times and listen to team radio communications as engineers gather 
   if (sessionType.toLowerCase().includes('qualifying')) {
     return `This is ${session.sessionName} for the ${raceData.name}.
 
-Scheduled for ${session.date} at ${session.time}.
+${scheduleText}
 
 Qualifying determines the starting grid for the race! The session is divided into three knockout rounds: Q1, Q2, and Q3. The slowest drivers are eliminated after Q1 and Q2, while the top 10 battle it out in Q3 for pole position.
 
@@ -427,7 +431,7 @@ Pole position is crucial as it gives the driver the best chance of leading into 
   if (sessionType.toLowerCase().includes('sprint')) {
     return `This is ${session.sessionName} for the ${raceData.name}.
 
-Scheduled for ${session.date} at ${session.time}.
+${scheduleText}
 
 The Sprint is a shorter race format that determines part of the starting grid for the main Grand Prix. It's high-intensity racing with limited laps, so every position matters!
 
@@ -437,7 +441,7 @@ Drivers will be pushing flat out from the start, and with reduced strategic opti
   if (sessionType.toLowerCase().includes('race')) {
     return `This is the main ${session.sessionName} of the ${raceData.name}!
 
-Scheduled for ${session.date} at ${session.time}.
+${scheduleText}
 
 This is what it's all about! The Grand Prix will see drivers battle for maximum points over the full race distance. Strategy, tire management, and racecraft will all play crucial roles.
 
@@ -449,7 +453,7 @@ Lights out and away we go!`;
   // Default text for other session types
   return `This is ${session.sessionName} for the ${raceData.name}.
 
-Scheduled for ${session.date} at ${session.time}.
+${scheduleText}
 
 This session is an important part of the ${raceData.name} weekend at ${raceData.circuit}. Teams and drivers will be working hard to prepare for the main race!`;
 }
