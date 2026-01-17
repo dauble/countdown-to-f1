@@ -256,7 +256,9 @@ function formatRaceData(session) {
     dateStart: session.date_start, // ISO date for timezone conversion in API route
     date: null, // Will be set by API route with user's timezone
     time: null, // Will be set by API route with user's timezone
-    year: session.year
+    year: session.year,
+    meetingKey: session.meeting_key, // Needed to fetch all sessions and details for this meeting
+    sessionKey: session.session_key, // Needed for weather data
   };
 }
 
@@ -311,4 +313,131 @@ Thank you for listening! Enjoy the racing!`;
     chapter3,
     full: `${chapter1}\n\n${chapter2}\n\n${chapter3}`
   };
+}
+
+/**
+ * Get all upcoming sessions for a meeting (Practice, Qualifying, Sprint, Race, etc.)
+ * @param {number} meetingKey - The meeting key from the race session
+ * @returns {Promise<Array>} Array of session objects
+ */
+export async function getUpcomingSessions(meetingKey) {
+  try {
+    const now = new Date().toISOString();
+    
+    // Fetch all sessions for this meeting that haven't ended yet
+    const response = await fetch(
+      `${F1_API_BASE}/sessions?meeting_key=${meetingKey}&date_start>=${now.split('T')[0]}`,
+      { signal: AbortSignal.timeout(5000) }
+    );
+
+    if (!response.ok) {
+      throw new Error("Failed to fetch sessions");
+    }
+
+    const sessions = await response.json();
+    
+    if (!sessions || sessions.length === 0) {
+      return [];
+    }
+    
+    // Sort by date_start to ensure chronological order
+    return sessions
+      .sort((a, b) => new Date(a.date_start) - new Date(b.date_start))
+      .map(session => ({
+        sessionName: session.session_name,
+        sessionType: session.session_type,
+        dateStart: session.date_start,
+        dateEnd: session.date_end,
+        location: session.location,
+        circuitName: session.circuit_short_name,
+        sessionKey: session.session_key, // Add session key for weather lookup
+      }));
+  } catch (error) {
+    console.log("Error fetching sessions:", error.message);
+    return [];
+  }
+}
+
+/**
+ * Get detailed meeting information
+ * @param {number} meetingKey - The meeting key
+ * @returns {Promise<Object|null>} Meeting details or null
+ */
+export async function getMeetingDetails(meetingKey) {
+  try {
+    const response = await fetch(
+      `${F1_API_BASE}/meetings?meeting_key=${meetingKey}`,
+      { signal: AbortSignal.timeout(5000) }
+    );
+
+    if (!response.ok) {
+      throw new Error("Failed to fetch meeting details");
+    }
+
+    const meetings = await response.json();
+    
+    if (!meetings || meetings.length === 0) {
+      return null;
+    }
+    
+    const meeting = meetings[0];
+    
+    return {
+      meetingName: meeting.meeting_name,
+      meetingOfficialName: meeting.meeting_official_name,
+      location: meeting.location,
+      countryName: meeting.country_name,
+      countryCode: meeting.country_code,
+      circuitShortName: meeting.circuit_short_name,
+      circuitKey: meeting.circuit_key,
+      circuitType: meeting.circuit_type, // "Permanent", "Temporary - Street", "Temporary - Road"
+      year: meeting.year,
+      gmtOffset: meeting.gmt_offset,
+    };
+  } catch (error) {
+    console.log("Error fetching meeting details:", error.message);
+    return null;
+  }
+}
+
+/**
+ * Get current weather conditions at the track
+ * @param {number} sessionKey - The session key to get weather for
+ * @returns {Promise<Object|null>} Weather data or null
+ */
+export async function getSessionWeather(sessionKey) {
+  try {
+    // Get the most recent weather reading for this session
+    const response = await fetch(
+      `${F1_API_BASE}/weather?session_key=${sessionKey}`,
+      { signal: AbortSignal.timeout(5000) }
+    );
+
+    if (!response.ok) {
+      throw new Error("Failed to fetch weather data");
+    }
+
+    const weatherData = await response.json();
+    
+    if (!weatherData || weatherData.length === 0) {
+      return null;
+    }
+    
+    // Get the most recent weather reading
+    const latestWeather = weatherData[weatherData.length - 1];
+    
+    return {
+      airTemperature: latestWeather.air_temperature,
+      trackTemperature: latestWeather.track_temperature,
+      humidity: latestWeather.humidity,
+      pressure: latestWeather.pressure,
+      rainfall: latestWeather.rainfall,
+      windSpeed: latestWeather.wind_speed,
+      windDirection: latestWeather.wind_direction,
+      date: latestWeather.date,
+    };
+  } catch (error) {
+    console.log("Error fetching weather data:", error.message);
+    return null;
+  }
 }

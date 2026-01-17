@@ -8,7 +8,8 @@ A Next.js application that automatically creates and updates Yoto MYO (Make Your
 
 - 🏁 **Next Race Information** - Automatically fetches the next upcoming F1 race
 - 🌍 **Timezone Conversion** - Displays race time in the user's local timezone based on IP address
-- 🔄 **Auto-Update** - Updates the same card with new race info (no need to create new cards each time)
+- � **Enhanced Race Details** - Includes country, circuit type, and live weather conditions
+- �🔄 **Auto-Update** - Updates the same card with new race info (no need to create new cards each time)
 - 🎙️ **Text-to-Speech** - Uses ElevenLabs via Yoto Labs API to generate audio
 - 🔐 **OAuth Authentication** - Secure authentication with Yoto (required before use)
 - 📱 **Responsive Design** - Works on desktop and mobile devices
@@ -178,7 +179,17 @@ On subsequent generations:
 
 Contributions are welcome! Please read [CONTRIBUTING.md](CONTRIBUTING.md) for details on our code of conduct and the process for submitting pull requests.
 
-## 🐛 Troubleshooting
+## � Documentation
+
+- [CHANGELOG.md](CHANGELOG.md) - Version history and release notes
+- [QUICKSTART.md](QUICKSTART.md) - 5-minute setup guide
+- [ENHANCED_RACE_DETAILS_FEATURE.md](ENHANCED_RACE_DETAILS_FEATURE.md) - Enhanced race information feature
+- [COVER_IMAGE_FEATURE.md](COVER_IMAGE_FEATURE.md) - Custom cover image functionality
+- [JOB_STATUS_FEATURE.md](JOB_STATUS_FEATURE.md) - Real-time TTS job status
+- [MYO_UPLOAD_FEATURE.md](MYO_UPLOAD_FEATURE.md) - Audio file upload guide
+- [CONTRIBUTING.md](CONTRIBUTING.md) - Contribution guidelines
+
+## �🐛 Troubleshooting
 
 ### "Not authenticated" error
 

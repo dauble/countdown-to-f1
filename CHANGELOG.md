@@ -5,6 +5,36 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- **Enhanced Race Details** - Cards now include additional contextual information:
+  - Official event name (e.g., "Formula 1 MSC Cruises Japanese Grand Prix 2024")
+  - Country name for each race
+  - Circuit type (Permanent, Temporary - Street, or Temporary - Road)
+  - Current weather conditions:
+    - Air and track temperatures
+    - Humidity percentage
+    - Wind speed
+    - Rainfall status (wet/dry track)
+- `getMeetingDetails()` function to fetch circuit and location information from OpenF1 API
+- `getSessionWeather()` function to fetch live weather data from OpenF1 API
+- `getUpcomingSessions()` function re-added to fetch all sessions for a race weekend
+- Comprehensive documentation in `ENHANCED_RACE_DETAILS_FEATURE.md`
+
+### Changed
+
+- `buildF1Chapters()` now accepts optional `meetingDetails` and `weather` parameters
+- Card generation process includes two additional API calls (gracefully degraded if they fail)
+- Chapter text is more descriptive and educational with location and weather context
+
+### Improved
+
+- More engaging and informative TTS content for children
+- Better understanding of race location and conditions
+- Educational value with country and circuit type information
+
 ## [1.1.0] - 2026-01-11
 
 ### Added

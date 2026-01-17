@@ -325,7 +325,66 @@ export async function deployToAllDevices(cardId, accessToken) {
  * @param {string|null} iconMediaId - Optional custom icon media ID (from uploadCardIcon)
  * @returns {Array} Array of chapter objects
  */
-export function buildF1Chapters(raceData, iconMediaId = null) {
+export function buildF1Chapters(raceData, iconMediaId = null, meetingDetails = null, weather = null) {
+  // Build the race description with enhanced details
+  let raceDescription = `Hello Formula 1 fans! Let me tell you about the next race in the ${raceData.year} season.
+
+The next race is the ${raceData.name}, taking place in ${raceData.location}.`;
+
+  // Add meeting details if available
+  if (meetingDetails) {
+    if (meetingDetails.meetingOfficialName && meetingDetails.meetingOfficialName !== raceData.name) {
+      raceDescription += `\n\nThe official name of this event is the ${meetingDetails.meetingOfficialName}.`;
+    }
+    
+    if (meetingDetails.countryName) {
+      raceDescription += `\n\nThis race takes place in ${meetingDetails.countryName}.`;
+    }
+    
+    if (meetingDetails.circuitType) {
+      const circuitTypeDescription = meetingDetails.circuitType === "Permanent" 
+        ? "a permanent racing circuit"
+        : meetingDetails.circuitType === "Temporary - Street"
+        ? "a temporary street circuit"
+        : meetingDetails.circuitType === "Temporary - Road"
+        ? "a temporary road circuit"
+        : "a racing circuit";
+      
+      raceDescription += ` The circuit is ${circuitTypeDescription}.`;
+    }
+  }
+
+  raceDescription += `\n\nThe race will be held on ${raceData.date}, at ${raceData.time}.`;
+
+  // Add weather information if available
+  if (weather) {
+    raceDescription += `\n\nCurrent weather conditions at the track:`;
+    
+    if (weather.airTemperature !== undefined) {
+      raceDescription += ` Air temperature is ${Math.round(weather.airTemperature)} degrees Celsius.`;
+    }
+    
+    if (weather.trackTemperature !== undefined) {
+      raceDescription += ` Track temperature is ${Math.round(weather.trackTemperature)} degrees Celsius.`;
+    }
+    
+    if (weather.humidity !== undefined) {
+      raceDescription += ` Humidity is ${Math.round(weather.humidity)} percent.`;
+    }
+    
+    if (weather.windSpeed !== undefined && weather.windSpeed > 0) {
+      raceDescription += ` Wind speed is ${Math.round(weather.windSpeed)} kilometers per hour.`;
+    }
+    
+    if (weather.rainfall !== undefined && weather.rainfall > 0) {
+      raceDescription += ` There is rainfall at the circuit.`;
+    } else if (weather.rainfall !== undefined) {
+      raceDescription += ` The track is dry with no rainfall.`;
+    }
+  }
+
+  raceDescription += `\n\nGet ready for an exciting race at ${raceData.circuit}!`;
+
   // Single chapter with the Next Race information
   const chapter = {
     title: "Next F1 Race",
@@ -333,13 +392,7 @@ export function buildF1Chapters(raceData, iconMediaId = null) {
     tracks: [
       {
         title: raceData.name,
-        text: `Hello Formula 1 fans! Let me tell you about the next race in the ${raceData.year} season.
-
-The next race is the ${raceData.name}, taking place in ${raceData.location}.
-
-The race will be held on ${raceData.date}, at ${raceData.time}.
-
-Get ready for an exciting race at ${raceData.circuit}!`,
+        text: raceDescription,
         icon: iconMediaId ? `yoto:#${iconMediaId}` : null, // Use custom icon if provided
       }
     ]

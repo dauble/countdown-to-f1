@@ -1,5 +1,5 @@
 // API Route to generate a Formula 1 card
-import { getNextRace, getDriverStandings, getTeamStandings, generateF1Script } from "@/services/f1Service";
+import { getNextRace, getDriverStandings, getTeamStandings, generateF1Script, getMeetingDetails, getSessionWeather } from "@/services/f1Service";
 import { createTextToSpeechPlaylist, buildF1Chapters, deployToAllDevices } from "@/services/yotoService";
 import { uploadCardCoverImage, uploadCardIcon } from "@/utils/imageUtils";
 import Configstore from "configstore";
@@ -121,19 +121,45 @@ export async function POST(request) {
     // Step 5: Generate script for text-to-speech
     const script = generateF1Script(raceData, driverStandings, teamStandings);
 
-    // Step 6: Upload custom icon if available (16x16 for display on Yoto device)
+    // Step 6: Fetch additional race details (meeting info and weather)
+    let meetingDetails = null;
+    let weather = null;
+    
+    if (raceData.meetingKey) {
+      try {
+        meetingDetails = await getMeetingDetails(raceData.meetingKey);
+        if (process.env.NODE_ENV !== "production") {
+          console.log(`Meeting details:`, meetingDetails);
+        }
+      } catch (error) {
+        console.warn('Failed to fetch meeting details:', error.message);
+      }
+    }
+    
+    if (raceData.sessionKey) {
+      try {
+        weather = await getSessionWeather(raceData.sessionKey);
+        if (process.env.NODE_ENV !== "production") {
+          console.log(`Weather data:`, weather);
+        }
+      } catch (error) {
+        console.warn('Failed to fetch weather data:', error.message);
+      }
+    }
+
+    // Step 7: Upload custom icon if available (16x16 for display on Yoto device)
     const iconMediaId = await uploadCardIcon(accessToken);
 
-    // Step 7: Build chapters for Yoto playlist with custom icon
-    const chapters = buildF1Chapters(raceData, iconMediaId);
+    // Step 8: Build chapters for Yoto playlist with custom icon and enhanced details
+    const chapters = buildF1Chapters(raceData, iconMediaId, meetingDetails, weather);
 
-    // Step 8: Check if we should update existing card
+    // Step 9: Check if we should update existing card
     const existingCardId = shouldUpdate ? getStoredCardId() : null;
     
-    // Step 9: Upload cover image if available
+    // Step 10: Upload cover image if available
     const coverImageUrl = await uploadCardCoverImage(accessToken);
     
-    // Step 10: Create or update the Yoto card with TTS
+    // Step 11: Create or update the Yoto card with TTS
     const title = `F1: Next Race`;
     const yotoResult = await createTextToSpeechPlaylist({
       title,
@@ -148,7 +174,7 @@ export async function POST(request) {
       storeCardId(yotoResult.cardId);
     }
 
-    // Step 11: Deploy the playlist to all devices
+    // Step 12: Deploy the playlist to all devices
     let deviceDeployment = null;
     if (yotoResult.cardId) {
       try {
@@ -166,7 +192,7 @@ export async function POST(request) {
       }
     }
 
-    // Step 12: Return success with job information
+    // Step 13: Return success with job information
     return Response.json({
       success: true,
       race: raceData,
