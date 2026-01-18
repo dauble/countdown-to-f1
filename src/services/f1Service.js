@@ -1,5 +1,10 @@
 // Formula 1 API Service using OpenF1
 // API Documentation: https://openf1.org/
+//
+// RATE LIMITING:
+// OpenF1 API has a strict limit of 3 requests per second.
+// This service includes 500ms delays between internal API calls (2 req/sec).
+// Callers must also add 500ms delays between function calls to stay under the limit.
 
 import { getCircuitTypeDescription } from "@/utils/circuitUtils";
 
@@ -56,6 +61,7 @@ export async function getNextRace() {
     
     if (!meetings || meetings.length === 0) {
       // If no future races this year, try next year
+      await new Promise(resolve => setTimeout(resolve, 500)); // Rate limit protection
       const nextYear = currentYear + 1;
       const nextYearResponse = await fetch(
         `${F1_API_BASE}/meetings?year=${nextYear}`,
@@ -158,6 +164,9 @@ export async function getDriverStandings() {
     // Get the last race session
     const lastSession = sessions[sessions.length - 1];
     
+    // Rate limit protection before next API call
+    await new Promise(resolve => setTimeout(resolve, 500));
+    
     // Fetch position data from the last session to get championship standings
     const positionResponse = await fetch(
       `${F1_API_BASE}/position?session_key=${lastSession.session_key}`,
@@ -183,8 +192,9 @@ export async function getDriverStandings() {
         driverFinalPositions.set(pos.driver_number, pos);
       }
     });
-    
-    // Fetch driver details to get names and teams
+        // Rate limit protection before next API call
+    await new Promise(resolve => setTimeout(resolve, 500));
+        // Fetch driver details to get names and teams
     const driversResponse = await fetch(
       `${F1_API_BASE}/drivers?session_key=${lastSession.session_key}`,
       { signal: AbortSignal.timeout(5000) }
@@ -251,6 +261,9 @@ export async function getTeamStandings() {
     
     // Get the last race session
     const lastSession = sessions[sessions.length - 1];
+    
+    // Rate limit protection before next API call
+    await new Promise(resolve => setTimeout(resolve, 500));
     
     // Fetch drivers from the last session to extract teams
     const driversResponse = await fetch(

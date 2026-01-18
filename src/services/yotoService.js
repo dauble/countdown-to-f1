@@ -42,6 +42,11 @@ export async function uploadCoverImage(imageBuffer, accessToken, contentType = '
 
     if (!response.ok) {
       const errorText = await response.text();
+      // Check if it's a permission error (some accounts don't have cover upload access)
+      if (errorText.includes('not authorized') || errorText.includes('explicit deny')) {
+        console.log('Note: Cover image uploads require special API permissions. Continuing without cover image.');
+        return null;
+      }
       throw new YotoApiError(`Failed to upload cover image: ${errorText}`, response.status);
     }
 
@@ -56,8 +61,14 @@ export async function uploadCoverImage(imageBuffer, accessToken, contentType = '
     return result.coverImage.mediaUrl;
 
   } catch (error) {
+    // Check if it's a permission error and handle gracefully
+    if (error.message?.includes('not authorized') || error.message?.includes('explicit deny')) {
+      console.log('Note: Cover image uploads require special API permissions. Continuing without cover image.');
+      return null;
+    }
     console.error('Cover image upload error:', error);
-    throw error;
+    // Return null instead of throwing to allow card creation to continue
+    return null;
   }
 }
 
@@ -134,17 +145,20 @@ export async function createTextToSpeechPlaylist({
       };
     }
 
-    // If updating existing card, add cardId
-    if (cardId) {
-      content.cardId = cardId;
-    }
-
     console.log("Creating Yoto TTS playlist with", chapters.length, "chapters");
+    if (cardId) {
+      console.log(`Note: Labs TTS API always creates new playlists. Will track cardId ${cardId} for reference.`);
+    }
     console.log("Chapters structure:", JSON.stringify(content.content.chapters, null, 2));
+
+    // Note: Labs TTS API does not support updating existing cards via cardId parameter.
+    // It always creates a new playlist. The returned cardId will be used for future reference.
+    const apiUrl = new URL(`${YOTO_LABS_API_BASE}/content/job`);
+    apiUrl.searchParams.set('voiceId', voiceId);
 
     // Submit to Labs API
     const response = await fetch(
-      `${YOTO_LABS_API_BASE}/content/job?voiceId=${voiceId}`,
+      apiUrl.toString(),
       {
         method: 'POST',
         headers: {
@@ -166,12 +180,10 @@ export async function createTextToSpeechPlaylist({
     
     return {
       jobId: job.jobId,
-      cardId: job.cardId || cardId, // Return cardId for storage
+      cardId: job.cardId, // Always use the newly created cardId from the API
       status: job.status,
       progress: job.progress,
-      message: cardId 
-        ? 'Card update job started successfully!' 
-        : 'New card creation job started successfully!'
+      message: 'TTS playlist job started successfully!'
     };
 
   } catch (error) {
@@ -209,6 +221,68 @@ export async function checkJobStatus(jobId, accessToken) {
   } catch (error) {
     console.error("Job status check error:", error);
     throw error;
+  }
+}
+
+/**
+ * Get all content (playlists/cards) from the user's library
+ * @param {string} accessToken - Yoto API access token
+ * @returns {Promise<Array>} Array of content objects
+ */
+export async function getUserContent(accessToken) {
+  try {
+    const response = await fetch(`${YOTO_API_BASE}/content`, {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${accessToken}`,
+        'Accept': 'application/json',
+      },
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new YotoApiError(`Failed to fetch user content: ${errorText}`, response.status);
+    }
+
+    const data = await response.json();
+    console.log(`Fetched ${data.content?.length || 0} content item(s) from library`);
+    
+    return data.content || [];
+  } catch (error) {
+    console.error("User content fetch error:", error);
+    throw error;
+  }
+}
+
+/**
+ * Find an existing card in the user's library by title
+ * @param {string} title - Title to search for (supports partial matching)
+ * @param {string} accessToken - Yoto API access token
+ * @returns {Promise<Object|null>} Found card object or null if not found
+ */
+export async function findCardByTitle(title, accessToken) {
+  try {
+    const content = await getUserContent(accessToken);
+    
+    // Search for a card matching the title (case-insensitive, supports partial matching)
+    const normalizedSearchTitle = title.toLowerCase().trim();
+    const foundCard = content.find(card => {
+      const cardTitle = (card.title || '').toLowerCase().trim();
+      // Match exact or if card title contains the search title
+      return cardTitle === normalizedSearchTitle || cardTitle.includes(normalizedSearchTitle);
+    });
+
+    if (foundCard) {
+      console.log(`Found existing card: "${foundCard.title}" (ID: ${foundCard.cardId})`);
+      return foundCard;
+    }
+
+    console.log(`No existing card found with title matching: "${title}"`);
+    return null;
+  } catch (error) {
+    console.error("Find card by title error:", error);
+    // Don't throw - return null to allow creating new card
+    return null;
   }
 }
 

@@ -1,5 +1,5 @@
 // API Route to send generated card data to Yoto
-import { createTextToSpeechPlaylist, deployToAllDevices } from "@/services/yotoService";
+import { createTextToSpeechPlaylist, deployToAllDevices, findCardByTitle } from "@/services/yotoService";
 import { uploadCardCoverImage } from "@/utils/imageUtils";
 import { getAccessToken, getStoredCardId, storeCardId, isAuthError, createAuthErrorResponse } from "@/utils/authUtils";
 
@@ -28,24 +28,23 @@ export async function POST(request) {
       );
     }
 
-    // Step 3: Check if we should update existing card
-    const existingCardId = updateExisting ? getStoredCardId() : null;
-    
-    // Step 4: Upload cover image if available
+    // Step 3: Upload cover image if available
     const coverImageUrl = await uploadCardCoverImage(accessToken);
     
-    // Step 5: Create or update the Yoto card with TTS
+    // Step 4: Create TTS playlist
+    // Note: Labs TTS API always creates new playlists, it doesn't support updating existing ones
     const yotoResult = await createTextToSpeechPlaylist({
       title,
       chapters,
       accessToken,
-      cardId: existingCardId,
+      cardId: null, // Labs API doesn't support updates
       coverImageUrl,
     });
 
-    // Store the card ID if it's a new card
-    if (yotoResult.cardId && !existingCardId) {
+    // Store the newly created card ID for future reference
+    if (yotoResult.cardId) {
       storeCardId(yotoResult.cardId);
+      console.log(`Stored new card ID: ${yotoResult.cardId}`);
     }
 
     // Step 6: Deploy the playlist to all devices
@@ -66,15 +65,13 @@ export async function POST(request) {
       }
     }
 
-    // Step 7: Return success with job information
+    // Step 6: Return success with job information
     return Response.json({
       success: true,
       yoto: yotoResult,
       deviceDeployment,
-      isUpdate: !!existingCardId,
-      message: existingCardId 
-        ? "Formula 1 card updated successfully! Changes will appear in your Yoto library shortly."
-        : "Formula 1 card created successfully! Check your Yoto library.",
+      isUpdate: false, // Labs TTS API always creates new playlists
+      message: "Formula 1 card created successfully! Check your Yoto library.",
     });
 
   } catch (error) {

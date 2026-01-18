@@ -36,6 +36,11 @@ export async function uploadCardIcon(accessToken) {
         
         if (!response.ok) {
           const errorText = await response.text();
+          // Check if it's a permission error (very common - icon uploads are restricted)
+          if (errorText.includes('not authorized') || errorText.includes('explicit deny')) {
+            console.log('Note: Custom icon uploads require special API permissions. Continuing without icon.');
+            return null;
+          }
           throw new Error(`Icon upload failed: ${errorText}`);
         }
         
@@ -112,6 +117,11 @@ export async function uploadCountryFlagIcon(flagUrl, accessToken, countryName = 
     
     if (!uploadResponse.ok) {
       const errorText = await uploadResponse.text();
+      // Check if it's a permission error (very common - icon uploads are restricted)
+      if (errorText.includes('not authorized') || errorText.includes('explicit deny')) {
+        console.log('Note: Custom icon uploads require special API permissions. Continuing without icon.');
+        return null;
+      }
       throw new Error(`Flag icon upload failed: ${errorText}`);
     }
     
@@ -125,7 +135,12 @@ export async function uploadCountryFlagIcon(flagUrl, accessToken, countryName = 
     console.log(`Country flag icon uploaded successfully with mediaId: ${mediaId}`);
     return mediaId;
   } catch (error) {
-    console.error('Error uploading country flag icon:', error);
+    // Check if it's a permission error and handle gracefully
+    if (error.message?.includes('not authorized') || error.message?.includes('explicit deny')) {
+      console.log('Note: Custom icon uploads require special API permissions. Continuing without icon.');
+    } else {
+      console.error('Error uploading country flag icon:', error);
+    }
     return null;
   }
 }
@@ -139,7 +154,12 @@ export async function uploadCardCoverImage(accessToken) {
   try {
     // Try to find a cover image in the card-images directory
     const publicDir = join(process.cwd(), 'public', 'assets', 'card-images');
-    const possibleImages = ['countdown-to-f1-card.png'];
+    const possibleImages = [
+      'f1-card-cover.jpg',
+      'f1-card-cover.jpeg', 
+      'f1-card-cover.png',
+      'countdown-to-f1-card.png'
+    ];
     
     for (const imageName of possibleImages) {
       try {
@@ -152,9 +172,14 @@ export async function uploadCardCoverImage(accessToken) {
         
         console.log(`Found cover image: ${imageName}, uploading to Yoto...`);
         const mediaUrl = await uploadCoverImage(imageBuffer, accessToken, contentType);
-        console.log(`Cover image uploaded successfully: ${mediaUrl}`);
         
-        return mediaUrl;
+        if (mediaUrl) {
+          console.log(`Cover image uploaded successfully: ${mediaUrl}`);
+          return mediaUrl;
+        } else {
+          console.log('Cover image upload skipped due to permissions');
+          return null;
+        }
       } catch (err) {
         // File not found, continue to next possibility
         console.error(`Error processing cover image "${imageName}":`, err);
