@@ -9,19 +9,18 @@ A Next.js application that automatically creates and updates Yoto MYO (Make Your
 - 🏁 **Multi-Session Chapters** - Separate chapters for each F1 session (Practice 1-3, Qualifying, Sprint, Race)
 - 📅 **Race Weekend Overview** - First chapter provides overall race weekend information
 - 🌍 **Automatic Timezone Conversion** - Race times converted to your local timezone via IP address detection
-- 🔄 **Auto-Update** - Updates the same card with new race info (no need to create new cards each time)
 - 🎙️ **Text-to-Speech** - Uses ElevenLabs via Yoto Labs API to generate audio
 - 🔐 **OAuth Authentication** - Secure authentication with Yoto (required before use)
 - 📱 **Responsive Design** - Works on desktop and mobile devices
-- 🏎️ **Custom Icons** - Race car icon displays on your Yoto player for each chapter
 
 ### Advanced Features
 
-- 🖼️ **Custom Cover Images** - Automatically uploads cover art from `public/assets/card-images/`
 - 📊 **Real-Time Job Status** - Live polling shows TTS generation progress (queued → processing → completed)
 - 🎵 **Audio File Upload** - Upload your own audio files to create MYO-compatible cards
 - 🔓 **Logout Functionality** - Easily logout and switch Yoto accounts
 - 📡 **Device Deployment** - Automatically deploys to all connected Yoto devices
+
+**Note:** Cover images and custom icons require special Yoto API permissions not available to standard accounts.
 
 ## 🚀 Quick Start
 
@@ -81,7 +80,6 @@ A Next.js application that automatically creates and updates Yoto MYO (Make Your
 1. **Connect with Yoto** - Click the "🔐 Connect with Yoto" button and authenticate
    - Authentication is required before you can use any features
    - Your session will persist across browser restarts
-2. **Add Cover Image** (Optional) - Place an image named `countdown-to-f1-card.png` in `public/assets/card-images/`
 
 ### Generate TTS Card
 
@@ -95,7 +93,6 @@ A Next.js application that automatically creates and updates Yoto MYO (Make Your
 
 - **Chapter 1**: Race Weekend Overview - Overall information about the upcoming race
 - **Chapter 2+**: Individual chapters for each session (Practice 1, Practice 2, Practice 3, Qualifying, Sprint if scheduled, and Race)
-- **Custom Icons**: Race car icon (🏎️) displays on your Yoto player
 - **Accurate Times**: All session times automatically converted to your local timezone based on your IP address
 
 ### Upload Audio to MYO Card
@@ -110,19 +107,7 @@ A Next.js application that automatically creates and updates Yoto MYO (Make Your
 - Click the "Logout" button in the footer to disconnect your Yoto account
 - You'll need to re-authenticate to use the app again
 
-## 🎯 How Auto-Update Works
-
-The first time you generate a card, the app:
-
-- Creates a new playlist in your Yoto library
-- Stores the card ID locally
-- Returns the playlist information
-
-On subsequent generations:
-
-- Updates the **same** card with new race information
-- No duplicate cards created
-- Your MYO card automatically gets the latest data!
+**Note:** Each time you generate a card, the Yoto Labs TTS API creates a new playlist. You may want to manually delete old F1 playlists from your library to avoid duplicates.
 
 ## 🛠️ Technology Stack
 
@@ -175,14 +160,6 @@ On subsequent generations:
    - Add `FLY_API_TOKEN` to GitHub repository secrets
    - Every push to `main` branch will auto-deploy via GitHub Actions!
 
-### Deploy to Vercel
-
-[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https://github.com/yoto-dev/yoto-f1-card)
-
-1. Click the deploy button above
-2. Add your environment variables in Vercel dashboard
-3. Deploy!
-
 ## 🤝 Contributing
 
 Contributions are welcome! Please read [CONTRIBUTING.md](documentation/CONTRIBUTING.md) for details on our code of conduct and the process for submitting pull requests.
@@ -204,18 +181,24 @@ Contributions are welcome! Please read [CONTRIBUTING.md](documentation/CONTRIBUT
 - Alternatively, visit `http://localhost:3000/api/auth/logout`
 - Refresh the page and the login button should appear
 
-### Card not updating
+### New playlists created each time
 
+- The Yoto Labs TTS API always creates new playlists - it doesn't support updating existing ones
+- This is different from the regular content API (used for audio uploads) which does support updates
+- You may need to manually delete old F1 playlists from your Yoto library
 - Watch the real-time status indicator - it shows: Queued → Processing → Completed
 - TTS processing typically takes 10-30 seconds
 - When status shows "✅ Completed", your card is ready in your Yoto library
-- Check your Yoto library in the app
 
 ### Cover image not appearing
 
-- Ensure image is named `countdown-to-f1-card.png` in `public/assets/card-images/`
-- Supported formats: PNG or JPG
-- Check console logs for upload confirmation
+**Cover images and custom icons require special Yoto API permissions:**
+
+- The `/media/coverImage/user/me/upload` endpoint is restricted to special account types
+- Standard OAuth accounts receive "not authorized" errors when attempting uploads
+- This is a Yoto API limitation, not an issue with the app
+- If cover images are important, contact developers@yotoplay.com to request permissions
+- The app works perfectly without cover images - all TTS content and functionality remains intact
 
 ### MYO audio upload fails
 

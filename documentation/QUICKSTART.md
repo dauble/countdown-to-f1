@@ -145,7 +145,7 @@ PORT=3001 npm run dev
 
 - [ ] Link your card to a physical MYO card
 - [ ] Set up automatic updates with cron
-- [ ] Deploy to Fly.io or Vercel (see README.md)
+- [ ] Deploy to Fly.io (see README.md)
 - [ ] Customize the voice or content
 - [ ] Star the repo on GitHub ⭐
 

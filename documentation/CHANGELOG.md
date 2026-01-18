@@ -142,7 +142,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **OAuth redirect URL issues on deployed environments** - App now correctly detects the base URL at runtime using `x-forwarded-host` and `x-forwarded-proto` headers
 - Final redirect after OAuth callback now uses the correct domain (no more localhost redirects in production)
-- Works seamlessly on Fly.io, Vercel, and other platforms without configuration
+- Works seamlessly on Fly.io and other platforms without configuration
 
 ### Changed
 
@@ -177,7 +177,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Single-click card generation
 - Automatic updates to existing cards (no duplicates)
 - Responsive web interface
-- Support for Fly.io and Vercel deployment
+- Support for Fly.io deployment
 
 ---
 

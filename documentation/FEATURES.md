@@ -15,19 +15,30 @@ This document describes all the features available in the Yoto Formula 1 Card Ge
 
 ## Overview
 
-Your Yoto F1 app now automatically uploads custom cover images to display as card artwork! This feature follows the official Yoto API guidelines for uploading custom cover images.
+**Note: Cover image uploads require special Yoto API permissions that are not available to standard accounts.**
 
-## How It Works
+The Yoto F1 app attempts to automatically upload custom cover images to display as card artwork. However, the `/media/coverImage/user/me/upload` endpoint is restricted and returns "not authorized" errors for most accounts.
 
-1. **Automatic Detection**: When you generate or update an F1 card, the app automatically looks for a cover image in the `public/assets/card-images/` directory
-2. **Smart Upload**: If an image is found, it's uploaded to Yoto's API with the `autoconvert=true` parameter, which automatically resizes and optimizes your image
-3. **Card Integration**: The uploaded image URL is included in your card's metadata and displayed as the card artwork in the Yoto app
+## API Restrictions
+
+The cover image upload feature:
+
+- **Requires special permissions** - Not available with standard OAuth `offline_access` scope
+- **Returns permission errors** - "User is not authorized to access this resource with an explicit deny"
+- **Handled gracefully** - The app continues to work without cover images when upload fails
+- **May require account upgrade** - Contact developers@yotoplay.com if cover uploads are important
+
+## How It Works (When Permissions Are Available)
+
+1. **Automatic Detection**: When you generate a card, the app automatically looks for a cover image in the `public/assets/card-images/` directory
+2. **Smart Upload**: If an image is found AND permissions allow, it's uploaded to Yoto's API with the `autoconvert=true` parameter
+3. **Card Integration**: The uploaded image URL is included in your card's metadata and displayed as the card artwork
 
 ## Adding Your Cover Image
 
 ### Step 1: Add Your Image
 
-Place your cover image in the `public/assets/card-images/` directory with this name:
+Place your cover image in the `public/assets/card-images/` directory with one of these names:
 
 - `f1-card-cover.jpg` (recommended)
 - `f1-card-cover.jpeg`
@@ -36,20 +47,16 @@ Place your cover image in the `public/assets/card-images/` directory with this n
 
 ### Step 2: Generate Your Card
 
-Run your app and authenticate with Yoto (required). Then generate an F1 card as usual. The app will:
+The app will attempt to upload the image. If you don't have permissions:
 
-1. Find your image
-2. Upload it to Yoto
-3. Create/update your card with the custom cover art
-
-### Step 3: View in Yoto App
-
-Your custom cover image will appear as the card artwork in the Yoto app and on compatible players!
+- A note will be logged: "Cover image uploads require special API permissions"
+- The card will be created successfully without the cover image
+- All TTS content and functionality works normally
 
 ## Image Guidelines
 
 - **Format**: JPEG or PNG
-- **Size**: Any size (Yoto automatically resizes)
+- **Size**: Any size (Yoto automatically resizes when upload succeeds)
 - **Recommended**: Square images (e.g., 500x500 or 1000x1000) work best
 - **Content**: Choose an F1-related image that represents your card
 
@@ -60,13 +67,11 @@ Your custom cover image will appear as the card artwork in the Yoto app and on c
 The implementation includes:
 
 1. **`uploadCoverImage()` function** in [src/services/yotoService.js](../src/services/yotoService.js)
-
    - Uploads image buffer to Yoto API
    - Returns media URL for use in card metadata
    - Uses `autoconvert=true` for automatic optimization
 
 2. **`createTextToSpeechPlaylist()` enhancement** in [src/services/yotoService.js](../src/services/yotoService.js)
-
    - Now accepts optional `coverImageUrl` parameter
    - Includes cover image in `metadata.cover.imageL` field
 
@@ -98,28 +103,33 @@ You can find F1 images from:
 
 **Image not appearing?**
 
+- **Most common**: Your account doesn't have cover image upload permissions (API returns "not authorized")
+- Contact developers@yotoplay.com to request special permissions if needed
+- The app will work perfectly without cover images - all core functionality remains
+
+**Have permissions but upload still failing?**
+
 - Check the file name matches one of the supported names
 - Ensure the image is in the correct directory: `public/assets/card-images/`
 - Check server logs for upload errors
 - Verify the image file isn't corrupted
-
-**Upload failing?**
-
-- Check your Yoto authentication is valid
 - Ensure the image file size isn't too large (< 10MB recommended)
-- Verify network connectivity to Yoto API
 
-## API Reference
+## Getting Cover Upload Permissions
 
-For more information about Yoto's cover image API, visit:
-https://yoto.dev/myo/uploading-cover-images/
+If cover images are important for your use case:
+
+1. Email developers@yotoplay.com
+2. Explain your F1 card project
+3. Request cover image upload API permissions
+4. They may grant special access depending on your account type
 
 ## Example
 
-To test the feature:
+If you have the required permissions:
 
 1. Download an F1 logo or race image
-2. Save it as `public/assets/card-images/countdown-to-f1-card.png`
+2. Save it as `public/assets/card-images/f1-card-cover.png`
 3. Run the app and generate a card
 4. Check your Yoto library - the card should have your custom image!
 
@@ -279,7 +289,6 @@ Your Yoto F1 app now supports uploading audio files to create MYO (Make Your Own
 Your app now offers two options:
 
 1. **TTS Card Generation** (existing feature)
-
    - Creates text-to-speech cards using the Labs API
    - Content appears in your library automatically
    - Can be linked to MYO cards through the Yoto app
@@ -681,7 +690,6 @@ if (raceData.meetingKey) {
 ### OpenF1 API Endpoints
 
 1. **Meetings**: `https://api.openf1.org/v1/meetings?meeting_key={meetingKey}`
-
    - Provides circuit type, country, official names
    - Updated before each race weekend
 

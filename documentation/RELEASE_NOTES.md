@@ -36,7 +36,7 @@
   - Feature overview
   - Installation instructions
   - Usage guide
-  - Deployment instructions (Fly.io & Vercel)
+  - Deployment instructions for Fly.io
   - Troubleshooting section
   - Contributing guidelines
 - **CONTRIBUTING.md**: Developer guidelines including:

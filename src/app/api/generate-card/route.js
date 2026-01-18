@@ -4,6 +4,12 @@ import { createTextToSpeechPlaylist, buildF1Chapters, deployToAllDevices } from 
 import { uploadCardIcon, uploadCountryFlagIcon } from "@/utils/imageUtils";
 import { getAccessToken, getStoredCardId, storeCardId, isAuthError, createAuthErrorResponse } from "@/utils/authUtils";
 
+// Increase max listeners to handle multiple AbortSignal.timeout() calls
+// Each OpenF1 API call uses AbortSignal.timeout(5000) which adds event listeners
+if (typeof process !== 'undefined' && process.setMaxListeners) {
+  process.setMaxListeners(20);
+}
+
 // Delay utility to respect OpenF1 API rate limit (3 requests/second)
 const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
@@ -60,14 +66,15 @@ export async function POST(request) {
     const userTimezone = await getUserTimezone(request);
     
     // Step 3: Fetch F1 data from API (sequential to respect 3 req/sec rate limit)
+    // Using 500ms delays = 2 req/sec, well below the 3 req/sec limit for safety
     const raceData = await getNextRace();
-    await delay(400); // Wait 400ms between requests (allows 2.5 req/sec safely)
+    await delay(500);
     
     const driverStandings = await getDriverStandings();
-    await delay(400);
+    await delay(500);
     
     const teamStandings = await getTeamStandings();
-    await delay(400);
+    await delay(500);
 
     // Step 4: Convert race time to user's timezone
     if (raceData.dateStart) {
@@ -101,6 +108,7 @@ export async function POST(request) {
     let sessions = [];
     if (raceData.meetingKey) {
       const rawSessions = await getUpcomingSessions(raceData.meetingKey);
+      await delay(500); // Rate limit protection after sessions call
       
       // Convert session times to user's timezone
       sessions = rawSessions.map(session => {
@@ -139,7 +147,7 @@ export async function POST(request) {
         console.log(`Fetching meeting details for meetingKey: ${raceData.meetingKey}`);
         meetingDetails = await getMeetingDetails(raceData.meetingKey);
         console.log('Meeting details fetched:', meetingDetails);
-        await delay(400); // Rate limit protection
+        await delay(500); // Increased to 500ms for extra safety
       } catch (error) {
         console.error('Failed to fetch meeting details:', error.message);
       }
@@ -151,7 +159,7 @@ export async function POST(request) {
         console.log(`Fetching weather for sessionKey: ${sessions[0].sessionKey}`);
         weather = await getSessionWeather(sessions[0].sessionKey);
         console.log('Weather data fetched:', weather);
-        await delay(400); // Rate limit protection
+        await delay(500); // Increased to 500ms for extra safety
       } catch (error) {
         console.error('Failed to fetch weather data:', error.message);
       }
