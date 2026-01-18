@@ -1,4 +1,6 @@
 name: Deploy to Fly.io
+permissions:
+  contents: read
 
 on:
   push:
