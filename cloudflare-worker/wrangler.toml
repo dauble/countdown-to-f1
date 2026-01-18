@@ -1,0 +1,32 @@
+name = "f1-yoto-myo-worker"
+main = "worker.js"
+compatibility_date = "2024-01-01"
+
+# KV namespace binding for storing F1 data
+[[kv_namespaces]]
+binding = "F1_DATA"
+id = "your_kv_namespace_id_here"
+
+# Schedule daily refresh at 6:00 AM UTC (adjust as needed)
+[triggers]
+crons = ["0 6 * * *"]
+
+# Routes configuration (update with your custom domain)
+# routes = [
+#   { pattern = "your-domain.workers.dev/*", zone_name = "your-domain.workers.dev" }
+# ]
+
+# Environment-specific configuration
+[env.production]
+name = "f1-yoto-myo-worker"
+# Production KV namespace
+[[env.production.kv_namespaces]]
+binding = "F1_DATA"
+id = "your_production_kv_namespace_id"
+
+[env.staging]
+name = "f1-yoto-myo-worker-staging"
+# Staging KV namespace
+[[env.staging.kv_namespaces]]
+binding = "F1_DATA"
+id = "your_staging_kv_namespace_id"

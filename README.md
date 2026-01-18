@@ -19,6 +19,7 @@ A Next.js application that automatically creates and updates Yoto MYO (Make Your
 - 🎵 **Audio File Upload** - Upload your own audio files to create MYO-compatible cards
 - 🔓 **Logout Functionality** - Easily logout and switch Yoto accounts
 - 📡 **Device Deployment** - Automatically deploys to all connected Yoto devices
+- ☁️ **Cloudflare Worker Integration** - Optional serverless worker for automatic daily content updates
 
 **Note:** Cover images and custom icons require special Yoto API permissions not available to standard accounts.
 
@@ -239,6 +240,37 @@ Contributions are welcome! Please read [CONTRIBUTING.md](documentation/CONTRIBUT
 - No configuration needed - works on Fly.io, Vercel, and other platforms
 - If issues persist, check your Yoto app redirect URI matches your domain
 
+## ☁️ Cloudflare Worker for Auto-Refresh
+
+Want your MYO card to automatically fetch fresh F1 data every time it's played? Deploy the optional Cloudflare Worker!
+
+### Features
+
+- **Automatic Daily Updates**: Fetches latest F1 data from OpenF1 API every day
+- **Global CDN**: Low-latency access from anywhere in the world
+- **Free Tier Friendly**: Runs on Cloudflare's generous free tier
+- **No Manual Updates**: Set it and forget it - your card stays current automatically
+
+### Quick Setup
+
+1. **Deploy the Worker** (see [cloudflare-worker/DEPLOYMENT.md](cloudflare-worker/DEPLOYMENT.md) for full instructions)
+   ```bash
+   cd cloudflare-worker
+   npm install -g wrangler
+   wrangler login
+   wrangler deploy
+   ```
+
+2. **Configure Your App** (add to `.env`)
+   ```env
+   USE_CLOUDFLARE_WORKER=true
+   CLOUDFLARE_WORKER_URL=https://your-worker.workers.dev
+   ```
+
+3. **That's it!** Your MYO card will now fetch fresh data from the worker
+
+For detailed setup instructions, see the [Cloudflare Worker README](cloudflare-worker/README.md) and [Deployment Guide](cloudflare-worker/DEPLOYMENT.md).
+
 ## 📄 License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
@@ -251,6 +283,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 - [Cover Image Feature](documentation/COVER_IMAGE_FEATURE.md) - Custom cover image setup
 - [Job Status Feature](documentation/JOB_STATUS_FEATURE.md) - Real-time TTS status polling
 - [MYO Upload Feature](documentation/MYO_UPLOAD_FEATURE.md) - Audio file upload guide
+- [Cloudflare Worker](cloudflare-worker/README.md) - Auto-refresh setup with Cloudflare Workers
 - [Contributing Guide](documentation/CONTRIBUTING.md) - How to contribute to the project
 
 ## 🙏 Acknowledgments

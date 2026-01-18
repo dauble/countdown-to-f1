@@ -1,0 +1,17 @@
+# Dependencies
+node_modules
+package-lock.json
+
+# Wrangler
+.wrangler
+.dev.vars
+
+# Environment files
+.env
+.env.local
+
+# Logs
+*.log
+
+# OS
+.DS_Store
