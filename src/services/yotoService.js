@@ -225,68 +225,6 @@ export async function checkJobStatus(jobId, accessToken) {
 }
 
 /**
- * Get all content (playlists/cards) from the user's library
- * @param {string} accessToken - Yoto API access token
- * @returns {Promise<Array>} Array of content objects
- */
-export async function getUserContent(accessToken) {
-  try {
-    const response = await fetch(`${YOTO_API_BASE}/content`, {
-      method: 'GET',
-      headers: {
-        'Authorization': `Bearer ${accessToken}`,
-        'Accept': 'application/json',
-      },
-    });
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      throw new YotoApiError(`Failed to fetch user content: ${errorText}`, response.status);
-    }
-
-    const data = await response.json();
-    console.log(`Fetched ${data.content?.length || 0} content item(s) from library`);
-    
-    return data.content || [];
-  } catch (error) {
-    console.error("User content fetch error:", error);
-    throw error;
-  }
-}
-
-/**
- * Find an existing card in the user's library by title
- * @param {string} title - Title to search for (supports partial matching)
- * @param {string} accessToken - Yoto API access token
- * @returns {Promise<Object|null>} Found card object or null if not found
- */
-export async function findCardByTitle(title, accessToken) {
-  try {
-    const content = await getUserContent(accessToken);
-    
-    // Search for a card matching the title (case-insensitive, supports partial matching)
-    const normalizedSearchTitle = title.toLowerCase().trim();
-    const foundCard = content.find(card => {
-      const cardTitle = (card.title || '').toLowerCase().trim();
-      // Match exact or if card title contains the search title
-      return cardTitle === normalizedSearchTitle || cardTitle.includes(normalizedSearchTitle);
-    });
-
-    if (foundCard) {
-      console.log(`Found existing card: "${foundCard.title}" (ID: ${foundCard.cardId})`);
-      return foundCard;
-    }
-
-    console.log(`No existing card found with title matching: "${title}"`);
-    return null;
-  } catch (error) {
-    console.error("Find card by title error:", error);
-    // Don't throw - return null to allow creating new card
-    return null;
-  }
-}
-
-/**
  * Get all devices associated with the user's account
  * @param {string} accessToken - Yoto API access token
  * @returns {Promise<Array>} Array of device objects

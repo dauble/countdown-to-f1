@@ -108,7 +108,7 @@ export async function POST(request) {
     let sessions = [];
     if (raceData.meetingKey) {
       const rawSessions = await getUpcomingSessions(raceData.meetingKey);
-      await delay(400); // Rate limit protection after sessions call
+      await delay(500); // Rate limit protection after sessions call
       
       // Convert session times to user's timezone
       sessions = rawSessions.map(session => {

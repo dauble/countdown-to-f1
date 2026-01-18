@@ -15,7 +15,7 @@ A Next.js application that automatically creates and updates Yoto MYO (Make Your
 
 ### Advanced Features
 
-- � **Real-Time Job Status** - Live polling shows TTS generation progress (queued → processing → completed)
+- 📊 **Real-Time Job Status** - Live polling shows TTS generation progress (queued → processing → completed)
 - 🎵 **Audio File Upload** - Upload your own audio files to create MYO-compatible cards
 - 🔓 **Logout Functionality** - Easily logout and switch Yoto accounts
 - 📡 **Device Deployment** - Automatically deploys to all connected Yoto devices

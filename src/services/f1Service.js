@@ -192,9 +192,9 @@ export async function getDriverStandings() {
         driverFinalPositions.set(pos.driver_number, pos);
       }
     });
-        // Rate limit protection before next API call
+    // Rate limit protection before next API call
     await new Promise(resolve => setTimeout(resolve, 500));
-        // Fetch driver details to get names and teams
+    // Fetch driver details to get names and teams
     const driversResponse = await fetch(
       `${F1_API_BASE}/drivers?session_key=${lastSession.session_key}`,
       { signal: AbortSignal.timeout(5000) }
