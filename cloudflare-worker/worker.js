@@ -9,7 +9,7 @@
  * - Scheduled daily refresh of F1 data from OpenF1 API
  * - Serves cached playlist data to Yoto MYO card requests
  * - Handles timezone conversion for race times
- * - Rate-limited API calls to respect OpenF1limits (3 req/sec)
+ * - Rate-limited API calls to respect OpenF1 limits (3 req/sec)
  */
 
 const F1_API_BASE = 'https://api.openf1.org/v1';

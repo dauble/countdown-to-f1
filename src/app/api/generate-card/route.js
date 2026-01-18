@@ -188,11 +188,14 @@ export async function POST(request) {
     // Step 5: Generate script for text-to-speech
     const script = generateF1Script(raceData, driverStandings, teamStandings);
 
-    // Step 6: Fetch additional race details (meeting info) if not from worker
+    // Step 6: Fetch additional race details (meeting info) if not already fetched from worker
     // Continue respecting OpenF1 rate limit
     let meetingDetails = null;
     
-    if (raceData.meetingKey && !useWorker) {
+    // Only fetch meeting details if we didn't get data from the worker
+    const shouldFetchMeetingDetails = !useWorker || !workerUrl;
+    
+    if (raceData.meetingKey && shouldFetchMeetingDetails) {
       try {
         console.log(`Fetching meeting details for meetingKey: ${raceData.meetingKey}`);
         meetingDetails = await getMeetingDetails(raceData.meetingKey);
