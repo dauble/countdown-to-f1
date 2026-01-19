@@ -10,6 +10,7 @@ Before you begin, ensure you have:
    - Sign up at: https://dash.cloudflare.com/sign-up
 
 2. **Node.js and npm** installed (v16 or higher)
+
    ```bash
    node --version  # Should be v16+
    npm --version
@@ -27,10 +28,11 @@ Before you begin, ensure you have:
 Open your terminal and run:
 
 ```bash
-wrangler login
+npx wrangler login
 ```
 
 This will:
+
 - Open your browser
 - Ask you to log in to Cloudflare
 - Grant Wrangler access to your account
@@ -47,10 +49,10 @@ KV (Key-Value) storage is where the worker caches F1 data. Create two namespaces
 
 ```bash
 # Production namespace
-wrangler kv:namespace create "F1_DATA"
+npx wrangler kv:namespace create "F1_DATA"
 
 # Preview namespace (for local testing)
-wrangler kv:namespace create "F1_DATA" --preview
+npx wrangler kv:namespace create "F1_DATA" --preview
 ```
 
 **Important**: Copy the namespace IDs from the output. You'll see something like:
@@ -82,17 +84,20 @@ preview_id = "xyz789ghi012"  # Replace with YOUR preview namespace ID
 In `wrangler.toml`, you can customize:
 
 #### Worker Name
+
 ```toml
 name = "f1-yoto-myo-worker"  # Change if desired
 ```
 
 #### Update Schedule
+
 ```toml
 [triggers]
 crons = ["0 6 * * *"]  # Daily at 6:00 AM UTC
 ```
 
 Common schedules:
+
 - `"0 6 * * *"` - Daily at 6:00 AM UTC
 - `"0 */6 * * *"` - Every 6 hours
 - `"0 0 * * 0"` - Weekly on Sunday at midnight
@@ -140,6 +145,7 @@ curl https://f1-yoto-myo-worker.your-subdomain.workers.dev/health
 ```
 
 Expected response:
+
 ```json
 {
   "status": "healthy",
@@ -157,6 +163,7 @@ curl -X POST https://f1-yoto-myo-worker.your-subdomain.workers.dev/refresh
 ```
 
 Expected response:
+
 ```json
 {
   "success": true,
@@ -255,6 +262,7 @@ wrangler deploy
 ### Issue: "Rate limit exceeded from OpenF1 API"
 
 **Solution**: The worker includes rate limiting (500ms delays). If you still see errors:
+
 1. Check if you're making additional requests outside the worker
 2. Increase the delay in `worker.js` (line ~13)
 3. Reduce the cron frequency in `wrangler.toml`
@@ -265,7 +273,8 @@ wrangler deploy
 
 ### Issue: "No cached data"
 
-**Solution**: 
+**Solution**:
+
 1. Manually trigger refresh: `curl -X POST https://your-worker.workers.dev/refresh`
 2. Wait for the scheduled cron to run (check your cron schedule)
 3. Verify OpenF1 API is accessible: `curl https://api.openf1.org/v1/meetings`
@@ -273,16 +282,19 @@ wrangler deploy
 ## Cost Information
 
 **Cloudflare Workers Free Tier includes:**
+
 - 100,000 requests/day
 - 10ms CPU time per request
 - KV: 100,000 reads/day, 1,000 writes/day, 1 GB storage
 
 **Expected Usage:**
+
 - Scheduled updates: 1-24 writes/day (depending on cron schedule)
 - MYO card plays: 1 read per card play
 - Typical cost: **$0/month** on free tier
 
 If you exceed free tier limits, costs are minimal:
+
 - $0.50 per million requests
 - $0.50 per million KV reads
 
@@ -314,7 +326,7 @@ on:
     branches:
       - main
     paths:
-      - 'cloudflare-worker/**'
+      - "cloudflare-worker/**"
 
 jobs:
   deploy:
@@ -323,15 +335,16 @@ jobs:
       - uses: actions/checkout@v3
       - uses: actions/setup-node@v3
         with:
-          node-version: '18'
+          node-version: "18"
       - name: Deploy
         uses: cloudflare/wrangler-action@v3
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          workingDirectory: 'cloudflare-worker'
+          workingDirectory: "cloudflare-worker"
 ```
 
 Add your Cloudflare API token to GitHub Secrets:
+
 1. Get token: https://dash.cloudflare.com/profile/api-tokens
 2. Add to: **Repository Settings** → **Secrets** → **New repository secret**
 3. Name: `CLOUDFLARE_API_TOKEN`

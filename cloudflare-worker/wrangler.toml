@@ -5,7 +5,7 @@ compatibility_date = "2024-01-01"
 # KV namespace binding for storing F1 data
 [[kv_namespaces]]
 binding = "F1_DATA"
-id = "your_kv_namespace_id_here"
+id = "d3e9ce1a8db6447a80cde6e0be1df9f6"
 
 # Schedule daily refresh at 6:00 AM UTC (adjust as needed)
 [triggers]

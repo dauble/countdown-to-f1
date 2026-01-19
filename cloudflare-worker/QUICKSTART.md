@@ -19,7 +19,7 @@ npm install -g wrangler
 ### 2. Login to Cloudflare
 
 ```bash
-wrangler login
+npx wrangler login
 ```
 
 This opens your browser - just log in and grant access.
@@ -28,7 +28,7 @@ This opens your browser - just log in and grant access.
 
 ```bash
 cd cloudflare-worker
-wrangler kv:namespace create "F1_DATA"
+npx wrangler kv namespace create F1_DATA
 ```
 
 Copy the namespace ID from the output (looks like: `abc123def456`)
@@ -46,7 +46,7 @@ id = "abc123def456"  # <-- Put your ID here
 ### 5. Deploy
 
 ```bash
-wrangler deploy
+npx wrangler deploy
 ```
 
 You'll get a URL like: `https://f1-yoto-myo-worker.your-subdomain.workers.dev`
@@ -85,6 +85,7 @@ curl https://your-worker.workers.dev/health
 ```
 
 Should return:
+
 ```json
 {
   "status": "healthy",
@@ -104,17 +105,21 @@ Should return F1 race information in JSON format.
 ## Troubleshooting
 
 **Problem**: `wrangler: command not found`
+
 - **Solution**: Make sure you installed wrangler globally: `npm install -g wrangler`
 
 **Problem**: Worker returns "No cached data"
+
 - **Solution**: Run the manual refresh: `curl -X POST https://your-worker.workers.dev/refresh`
 
 **Problem**: App still uses OpenF1 directly
+
 - **Solution**: Check your `.env` file has the correct settings and restart your app
 
 ## Need More Help?
 
 See the detailed guides:
+
 - [Full README](README.md) - Complete feature documentation
 - [Deployment Guide](DEPLOYMENT.md) - Step-by-step instructions with examples
 - [Feature Documentation](../documentation/CLOUDFLARE_WORKER_FEATURE.md) - Architecture and details
@@ -124,6 +129,7 @@ See the detailed guides:
 This runs on Cloudflare's free tier. Expected cost: **$0/month** for typical usage.
 
 Free tier includes:
+
 - 100,000 requests/day
 - 10ms CPU time per request
 - Unlimited storage (effectively)
@@ -140,6 +146,7 @@ crons = ["0 6 * * *"]  # Daily at 6:00 AM UTC
 ```
 
 Examples:
+
 - `"0 */6 * * *"` - Every 6 hours
 - `"0 0 * * *"` - Daily at midnight UTC
 - `"0 12 * * *"` - Daily at noon UTC
