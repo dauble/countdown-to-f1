@@ -5,6 +5,21 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- **Cloudflare Worker Auto-Refresh** - Optional serverless integration for automatic content updates
+  - Daily scheduled data refresh from OpenF1 API
+  - Global edge caching with Cloudflare KV storage
+  - Manual refresh endpoint for immediate updates
+  - Health check endpoint for monitoring
+  - Runs on Cloudflare's free tier for typical usage
+  - Optional integration - enable via environment variables
+  - Comprehensive deployment and configuration documentation
+  - Reduces API load on OpenF1 with intelligent caching
+  - Low-latency access from anywhere in the world
+
 ## [1.3.0] - 2026-01-17
 
 ### Added

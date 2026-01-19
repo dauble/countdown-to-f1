@@ -1,0 +1,28 @@
+{
+  "name": "f1-yoto-myo-worker",
+  "version": "1.0.0",
+  "description": "Cloudflare Worker for Yoto MYO Card Auto-Refresh",
+  "main": "worker.js",
+  "scripts": {
+    "deploy": "wrangler deploy",
+    "deploy:staging": "wrangler deploy --env staging",
+    "deploy:production": "wrangler deploy --env production",
+    "dev": "wrangler dev",
+    "tail": "wrangler tail",
+    "kv:create": "wrangler kv:namespace create F1_DATA",
+    "kv:create:preview": "wrangler kv:namespace create F1_DATA --preview"
+  },
+  "keywords": [
+    "cloudflare-worker",
+    "yoto",
+    "formula1",
+    "f1",
+    "myo",
+    "openf1"
+  ],
+  "author": "yoto-f1-card maintainers",
+  "license": "MIT",
+  "devDependencies": {
+    "wrangler": "^3.0.0"
+  }
+}

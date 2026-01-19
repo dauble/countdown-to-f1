@@ -65,10 +65,68 @@ export async function POST(request) {
     // Step 2: Get user's timezone
     const userTimezone = await getUserTimezone(request);
     
-    // Step 3: Fetch F1 data from API (sequential to respect 3 req/sec rate limit)
-    // Using 500ms delays = 2 req/sec, well below the 3 req/sec limit for safety
-    const raceData = await getNextRace();
-    await delay(500);
+    // Step 3: Fetch F1 data - either from Cloudflare Worker or OpenF1 API
+    let raceData, sessions = [], weather = null;
+    
+    const useWorker = process.env.USE_CLOUDFLARE_WORKER === 'true';
+    const workerUrl = process.env.CLOUDFLARE_WORKER_URL;
+    
+    if (useWorker && workerUrl) {
+      console.log('Fetching data from Cloudflare Worker:', workerUrl);
+      
+      try {
+        const workerResponse = await fetch(`${workerUrl}/playlist`, {
+          signal: AbortSignal.timeout(10000)
+        });
+        
+        if (!workerResponse.ok) {
+          throw new Error(`Worker returned ${workerResponse.status}`);
+        }
+        
+        const workerData = await workerResponse.json();
+        raceData = workerData.race;
+        sessions = workerData.sessions || [];
+        weather = workerData.weather || null;
+        
+        console.log(`Fetched data from worker, last updated: ${workerData.lastUpdated}`);
+      } catch (error) {
+        console.warn('Failed to fetch from Cloudflare Worker, falling back to OpenF1 API:', error.message);
+        // Fall through to OpenF1 API fetch
+      }
+    }
+    
+    // If worker fetch failed or not enabled, fetch from OpenF1 API
+    if (!raceData) {
+      console.log('Fetching data from OpenF1 API');
+      
+      // Sequential API calls to respect 3 req/sec rate limit
+      // Using 500ms delays = 2 req/sec, well below the 3 req/sec limit for safety
+      raceData = await getNextRace();
+      await delay(500);
+      
+      // Step 4a: Fetch all upcoming sessions for this race weekend
+      if (raceData.meetingKey) {
+        const rawSessions = await getUpcomingSessions(raceData.meetingKey);
+        await delay(500); // Rate limit protection after sessions call
+        
+        // Sessions will be converted to user timezone below
+        sessions = rawSessions;
+        
+        console.log(`Found ${sessions.length} upcoming sessions for this race weekend`);
+      }
+      
+      // Fetch weather data for first session if available
+      if (sessions.length > 0 && sessions[0].sessionKey) {
+        try {
+          console.log(`Fetching weather for sessionKey: ${sessions[0].sessionKey}`);
+          weather = await getSessionWeather(sessions[0].sessionKey);
+          console.log('Weather data fetched:', weather);
+          await delay(500);
+        } catch (error) {
+          console.error('Failed to fetch weather data:', error.message);
+        }
+      }
+    }
     
     const driverStandings = await getDriverStandings();
     await delay(500);
@@ -104,14 +162,9 @@ export async function POST(request) {
       console.warn('Cannot convert to user timezone without ISO timestamp');
     }
 
-    // Step 4a: Fetch all upcoming sessions for this race weekend
-    let sessions = [];
-    if (raceData.meetingKey) {
-      const rawSessions = await getUpcomingSessions(raceData.meetingKey);
-      await delay(500); // Rate limit protection after sessions call
-      
-      // Convert session times to user's timezone
-      sessions = rawSessions.map(session => {
+    // Convert session times to user's timezone if we have sessions
+    if (sessions.length > 0 && sessions[0].dateStart) {
+      sessions = sessions.map(session => {
         const sessionDate = new Date(session.dateStart);
         return {
           ...session,
@@ -130,19 +183,19 @@ export async function POST(request) {
           })
         };
       });
-      
-      console.log(`Found ${sessions.length} upcoming sessions for this race weekend`);
     }
 
     // Step 5: Generate script for text-to-speech
     const script = generateF1Script(raceData, driverStandings, teamStandings);
 
-    // Step 6: Fetch additional race details (meeting info and weather)
+    // Step 6: Fetch additional race details (meeting info) if not already fetched from worker
     // Continue respecting OpenF1 rate limit
     let meetingDetails = null;
-    let weather = null;
     
-    if (raceData.meetingKey) {
+    // Only fetch meeting details if we didn't get data from the worker
+    const shouldFetchMeetingDetails = !useWorker || !workerUrl;
+    
+    if (raceData.meetingKey && shouldFetchMeetingDetails) {
       try {
         console.log(`Fetching meeting details for meetingKey: ${raceData.meetingKey}`);
         meetingDetails = await getMeetingDetails(raceData.meetingKey);
@@ -150,18 +203,6 @@ export async function POST(request) {
         await delay(500); // Increased to 500ms for extra safety
       } catch (error) {
         console.error('Failed to fetch meeting details:', error.message);
-      }
-    }
-    
-    // Get weather from the first session if available
-    if (sessions.length > 0 && sessions[0].sessionKey) {
-      try {
-        console.log(`Fetching weather for sessionKey: ${sessions[0].sessionKey}`);
-        weather = await getSessionWeather(sessions[0].sessionKey);
-        console.log('Weather data fetched:', weather);
-        await delay(500); // Increased to 500ms for extra safety
-      } catch (error) {
-        console.error('Failed to fetch weather data:', error.message);
       }
     }
 
