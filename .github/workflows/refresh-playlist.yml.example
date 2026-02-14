@@ -1,0 +1,73 @@
+name: Refresh F1 Yoto Playlist
+
+# This workflow automatically refreshes your F1 Yoto playlist with the latest data
+# from the Cloudflare Worker. It runs on a schedule and can also be triggered manually.
+
+on:
+  schedule:
+    # Run daily at 6:30 AM UTC (30 minutes after Cloudflare Worker updates)
+    # Adjust the time to your preference
+    - cron: '30 6 * * *'
+  
+  workflow_dispatch:
+    # Allows manual triggering from the GitHub Actions tab
+
+jobs:
+  refresh-playlist:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Trigger Playlist Refresh
+        run: |
+          echo "🔄 Triggering F1 playlist refresh..."
+          
+          # Make the webhook call
+          response=$(curl -s -w "\n%{http_code}" -X POST ${{ secrets.APP_URL }}/api/webhook/refresh-playlist \
+            -H "X-Webhook-Secret: ${{ secrets.WEBHOOK_SECRET }}" \
+            -H "Content-Type: application/json")
+          
+          # Extract status code and response body
+          http_code=$(echo "$response" | tail -n1)
+          body=$(echo "$response" | sed '$d')
+          
+          echo "Response code: $http_code"
+          echo "Response body: $body"
+          
+          # Check if request was successful
+          if [ "$http_code" -eq 200 ]; then
+            echo "✅ Playlist refresh successful!"
+            echo "$body" | jq -r '.race | "Race: \(.name) in \(.location), \(.country)"' || true
+            echo "$body" | jq -r '.yoto | "Job ID: \(.jobId), Status: \(.status)"' || true
+          else
+            echo "❌ Playlist refresh failed with status $http_code"
+            echo "$body"
+            exit 1
+          fi
+
+# Setup Instructions:
+# 
+# 1. Go to your GitHub repository → Settings → Secrets and variables → Actions
+# 
+# 2. Add these secrets:
+#    - APP_URL: Your deployed app URL (e.g., https://your-app.fly.dev)
+#    - WEBHOOK_SECRET: Your webhook secret from the .env file
+# 
+# 3. Enable the workflow:
+#    - Go to Actions tab
+#    - Select "Refresh F1 Yoto Playlist"
+#    - Click "Enable workflow" if needed
+# 
+# 4. Test manually:
+#    - Go to Actions tab
+#    - Select "Refresh F1 Yoto Playlist"
+#    - Click "Run workflow"
+# 
+# 5. Monitor scheduled runs:
+#    - Check the Actions tab after scheduled time
+#    - View logs to see refresh status
+# 
+# Notes:
+# - The workflow runs after the Cloudflare Worker updates (6 AM UTC)
+# - Adjust the cron schedule to your timezone preference
+# - Failed runs will be visible in the Actions tab
+# - You can trigger manual refreshes anytime via "Run workflow" button
