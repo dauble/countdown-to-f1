@@ -25,7 +25,7 @@ jobs:
           echo "🔄 Triggering F1 playlist refresh..."
 
           # Make the webhook call
-          response=$(curl -s -w "\n%{http_code}" -X POST ${{ secrets.APP_URL }}/api/refresh \
+          response=$(curl -s -w "\n%{http_code}" -X POST ${{ secrets.APP_URL }}/api/webhook/refresh-playlist \
             -H "X-Webhook-Secret: ${{ secrets.WEBHOOK_SECRET }}" \
             -H "Content-Type: application/json")
 
