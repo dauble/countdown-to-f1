@@ -20,6 +20,7 @@ A Next.js application that automatically creates and updates Yoto MYO (Make Your
 - 🔓 **Logout Functionality** - Easily logout and switch Yoto accounts
 - 📡 **Device Deployment** - Automatically deploys to all connected Yoto devices
 - ☁️ **Cloudflare Worker Integration** - Optional serverless worker for automatic daily content updates
+- 🔄 **Automatic Playlist Refresh** - Manual or scheduled automatic updates from the Cloudflare Worker
 
 **Note:** Cover images and custom icons require special Yoto API permissions not available to standard accounts.
 
@@ -250,6 +251,7 @@ Want your MYO card to automatically fetch fresh F1 data every time it's played? 
 - **Global CDN**: Low-latency access from anywhere in the world
 - **Free Tier Friendly**: Runs on Cloudflare's generous free tier
 - **No Manual Updates**: Set it and forget it - your card stays current automatically
+- **Manual & Automated Refresh**: Update playlists on-demand or via scheduled webhooks
 
 ### Quick Setup
 
@@ -264,12 +266,17 @@ Want your MYO card to automatically fetch fresh F1 data every time it's played? 
 2. **Configure Your App** (add to `.env`)
    ```env
    USE_CLOUDFLARE_WORKER=true
-   CLOUDFLARE_WORKER_URL=https://your-worker.workers.dev
+   CLOUDFLARE_WORKER_URL=https://f1-yoto-myo-worker.dauble2k5.workers.dev
+   
+   # Optional: For automated webhook refresh
+   WEBHOOK_SECRET=your_random_secret_here
    ```
 
-3. **That's it!** Your MYO card will now fetch fresh data from the worker
+3. **Use the Refresh Feature**:
+   - **Manual**: Click "🔄 Refresh Playlist from Worker" button in the UI
+   - **Automated**: Set up a cron job to call the webhook endpoint daily
 
-For detailed setup instructions, see the [Cloudflare Worker README](cloudflare-worker/README.md) and [Deployment Guide](cloudflare-worker/DEPLOYMENT.md).
+For detailed setup instructions, see the [Cloudflare Worker README](cloudflare-worker/README.md), [Deployment Guide](cloudflare-worker/DEPLOYMENT.md), and [Auto-Refresh Feature Guide](documentation/AUTO_REFRESH_FEATURE.md).
 
 ## 📄 License
 
@@ -283,6 +290,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 - [Cover Image Feature](documentation/COVER_IMAGE_FEATURE.md) - Custom cover image setup
 - [Job Status Feature](documentation/JOB_STATUS_FEATURE.md) - Real-time TTS status polling
 - [MYO Upload Feature](documentation/MYO_UPLOAD_FEATURE.md) - Audio file upload guide
+- [Auto-Refresh Feature](documentation/AUTO_REFRESH_FEATURE.md) - Automatic playlist updates from Cloudflare Worker
 - [Cloudflare Worker](cloudflare-worker/README.md) - Auto-refresh setup with Cloudflare Workers
 - [Contributing Guide](documentation/CONTRIBUTING.md) - How to contribute to the project
 
