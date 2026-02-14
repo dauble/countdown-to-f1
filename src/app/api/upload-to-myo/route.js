@@ -1,32 +1,7 @@
 // API Route to upload audio to MYO card
 import { requestAudioUploadUrl, uploadAudioFile, waitForTranscoding, createAudioCard } from "@/services/yotoService";
 import { uploadCardCoverImage } from "@/utils/imageUtils";
-import { getAccessToken, isAuthError, createAuthErrorResponse } from "@/utils/authUtils";
-import Configstore from "configstore";
-import path from "path";
-
-// Create config for MYO card ID storage (separate from auth tokens)
-const configPath = process.env.FLY_APP_NAME 
-  ? path.join('/data', '.config-yoto-f1-card-tokens')
-  : undefined;
-  
-const config = new Configstore("yoto-f1-card-tokens", {}, {
-  configPath
-});
-
-/**
- * Get stored MYO card ID
- */
-function getStoredMyoCardId() {
-  return config.get("f1MyoCardId");
-}
-
-/**
- * Store MYO card ID for future updates
- */
-function storeMyoCardId(cardId) {
-  config.set("f1MyoCardId", cardId);
-}
+import { getAccessToken, isAuthError, createAuthErrorResponse, getStoredMyoCardId, storeMyoCardId } from "@/utils/authUtils";
 
 export async function POST(request) {
   try {

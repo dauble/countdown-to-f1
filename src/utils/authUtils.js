@@ -59,7 +59,29 @@ export function getStoredCardId() {
  * Store card ID for future updates
  */
 export function storeCardId(cardId) {
-  config.set("f1CardId", cardId);
+  if (cardId === null) {
+    config.delete("f1CardId");
+  } else {
+    config.set("f1CardId", cardId);
+  }
+}
+
+/**
+ * Get stored MYO card ID
+ */
+export function getStoredMyoCardId() {
+  return config.get("f1MyoCardId");
+}
+
+/**
+ * Store MYO card ID for future updates
+ */
+export function storeMyoCardId(cardId) {
+  if (cardId === null) {
+    config.delete("f1MyoCardId");
+  } else {
+    config.set("f1MyoCardId", cardId);
+  }
 }
 
 /**
