@@ -11,6 +11,26 @@ const config = new Configstore("yoto-f1-card-tokens", {}, {
 });
 
 /**
+ * Store tokens (access and refresh)
+ * @param {string} accessToken - Access token
+ * @param {string} refreshToken - Refresh token
+ */
+export function storeTokens(accessToken, refreshToken) {
+  config.set("tokens", {
+    accessToken,
+    refreshToken,
+  });
+}
+
+/**
+ * Get all stored tokens
+ * @returns {Object|null} Tokens object with accessToken and refreshToken
+ */
+export function getStoredTokens() {
+  return config.get("tokens");
+}
+
+/**
  * Get stored access token
  */
 export function getAccessToken() {
@@ -19,6 +39,13 @@ export function getAccessToken() {
     return null;
   }
   return tokens.accessToken;
+}
+
+/**
+ * Clear all stored tokens
+ */
+export function clearTokens() {
+  config.delete("tokens");
 }
 
 /**

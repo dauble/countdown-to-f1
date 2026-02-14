@@ -1,20 +1,18 @@
 // API Route to upload audio to MYO card
 import { requestAudioUploadUrl, uploadAudioFile, waitForTranscoding, createAudioCard } from "@/services/yotoService";
 import { uploadCardCoverImage } from "@/utils/imageUtils";
+import { getAccessToken, isAuthError, createAuthErrorResponse } from "@/utils/authUtils";
 import Configstore from "configstore";
+import path from "path";
 
-const config = new Configstore("yoto-f1-card-tokens");
-
-/**
- * Get stored access token
- */
-function getAccessToken() {
-  const tokens = config.get("tokens");
-  if (!tokens || !tokens.accessToken) {
-    return null;
-  }
-  return tokens.accessToken;
-}
+// Create config for MYO card ID storage (separate from auth tokens)
+const configPath = process.env.FLY_APP_NAME 
+  ? path.join('/data', '.config-yoto-f1-card-tokens')
+  : undefined;
+  
+const config = new Configstore("yoto-f1-card-tokens", {}, {
+  configPath
+});
 
 /**
  * Get stored MYO card ID
@@ -104,29 +102,8 @@ export async function POST(request) {
   } catch (error) {
     console.error('MYO upload error:', error);
 
-    const status =
-      (error && typeof error === 'object' && 'status' in error && error.status) ||
-      (error &&
-        typeof error === 'object' &&
-        'response' in error &&
-        error.response &&
-        typeof error.response === 'object' &&
-        'status' in error.response &&
-        error.response.status);
-
-    const isAuthError =
-      status === 401 ||
-      (error &&
-        typeof error === 'object' &&
-        'message' in error &&
-        typeof error.message === 'string' &&
-        (error.message.includes('401') || error.message.toLowerCase().includes('unauthorized')));
-
-    if (isAuthError) {
-      return Response.json(
-        { error: "Authentication failed. Please reconnect with Yoto.", needsAuth: true },
-        { status: 401 }
-      );
+    if (isAuthError(error)) {
+      return createAuthErrorResponse();
     }
 
     return Response.json(
