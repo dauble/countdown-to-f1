@@ -1,7 +1,14 @@
 // Shared authentication and storage utilities
 import Configstore from "configstore";
+import path from "path";
 
-const config = new Configstore("yoto-f1-card-tokens");
+const configPath = process.env.FLY_APP_NAME 
+  ? path.join('/data', '.config-yoto-f1-card-tokens')
+  : undefined; // Uses default local path
+
+const config = new Configstore("yoto-f1-card-tokens", {}, {
+  configPath
+});
 
 /**
  * Get stored access token

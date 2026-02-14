@@ -21,3 +21,7 @@ primary_region = 'iad'
   cpu_kind = 'shared'
   cpus = 1
   memory_mb = 1024
+
+[[mounts]]
+  source = "yoto_data"
+  destination = "/data"
