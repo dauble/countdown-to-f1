@@ -17,6 +17,8 @@ export default function Home() {
   const [myoResult, setMyoResult] = useState(null);
   const [sendingToYoto, setSendingToYoto] = useState(false);
   const [yotoResult, setYotoResult] = useState(null);
+  const [refreshingPlaylist, setRefreshingPlaylist] = useState(false);
+  const [refreshResult, setRefreshResult] = useState(null);
 
   // Check authentication status on mount
   useEffect(() => {
@@ -193,6 +195,43 @@ export default function Home() {
     }
   };
 
+  const handleRefreshPlaylist = async () => {
+    setRefreshingPlaylist(true);
+    setError(null);
+    setRefreshResult(null);
+
+    try {
+      const response = await fetch('/api/refresh-myo-playlist', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        if (data.needsAuth) {
+          throw new Error('Please connect with Yoto first using the button above.');
+        }
+        throw new Error(data.error || 'Failed to refresh playlist');
+      }
+
+      setRefreshResult(data);
+      
+      // Start polling if we have a jobId
+      if (data.yoto && data.yoto.jobId) {
+        setPollingJobId(data.yoto.jobId);
+        setJobStatus({
+          status: data.yoto.status,
+          progress: { completed: 0, total: 0 },
+        });
+      }
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setRefreshingPlaylist(false);
+    }
+  };
+
   const handleLogout = async () => {
     try {
       await fetch('/api/auth/logout', { method: 'POST' });
@@ -204,6 +243,8 @@ export default function Home() {
       setPollingJobId(null);
       setYotoResult(null);
       setSendingToYoto(false);
+      setRefreshingPlaylist(false);
+      setRefreshResult(null);
     } catch (err) {
       console.error('Logout failed:', err);
     }
@@ -241,6 +282,118 @@ export default function Home() {
                 {loading ? "Generating..." : "Generate F1 Card"}
               </button>
             </form>
+
+            <div className={styles.refreshSection}>
+              <h3 className={styles.refreshTitle}>🔄 Auto-Refresh from Cloudflare Worker</h3>
+              <p className={styles.refreshDescription}>
+                Fetch the latest F1 data from the Cloudflare Worker (updated daily) and create a fresh playlist.
+                This uses your configured worker URL and automatically generates TTS content.
+              </p>
+              <button
+                onClick={handleRefreshPlaylist}
+                disabled={refreshingPlaylist}
+                className={styles.buttonRefresh}
+              >
+                {refreshingPlaylist ? "Refreshing..." : "🔄 Refresh Playlist from Worker"}
+              </button>
+            </div>
+
+            {refreshResult && (
+              <div className={styles.success}>
+                <h2>✅ {refreshResult.message}</h2>
+                
+                <div className={styles.refreshStatus}>
+                  <h3>🔄 Playlist Refresh Status</h3>
+                  
+                  <div className={styles.dataSource}>
+                    <h4>📡 Data Source</h4>
+                    <p><strong>Type:</strong> {refreshResult.dataSource.type}</p>
+                    <p><strong>URL:</strong> <code>{refreshResult.dataSource.url}</code></p>
+                    <p><strong>Last Updated:</strong> {new Date(refreshResult.dataSource.lastUpdated).toLocaleString()}</p>
+                  </div>
+
+                  <div className={styles.raceInfo}>
+                    <h4>🏁 Race Information</h4>
+                    <p><strong>Name:</strong> {refreshResult.race.name}</p>
+                    <p><strong>Location:</strong> {refreshResult.race.location}, {refreshResult.race.country}</p>
+                    <p><strong>Date:</strong> {refreshResult.race.date}</p>
+                    <p><strong>Time:</strong> {refreshResult.race.time}</p>
+                  </div>
+
+                  {refreshResult.sessions && refreshResult.sessions.length > 0 && (
+                    <div className={styles.sessions}>
+                      <h4>📅 Sessions ({refreshResult.sessions.length})</h4>
+                      <ul>
+                        {refreshResult.sessions.map((session, idx) => (
+                          <li key={idx}>
+                            <strong>{session.name}:</strong> {session.date} at {session.time}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+
+                  {refreshResult.weather && (
+                    <div className={styles.weather}>
+                      <h4>🌤️ Weather Conditions</h4>
+                      {refreshResult.weather.airTemperature && (
+                        <p><strong>Air Temp:</strong> {Math.round(refreshResult.weather.airTemperature)}°C</p>
+                      )}
+                      {refreshResult.weather.trackTemperature && (
+                        <p><strong>Track Temp:</strong> {Math.round(refreshResult.weather.trackTemperature)}°C</p>
+                      )}
+                      {refreshResult.weather.humidity && (
+                        <p><strong>Humidity:</strong> {Math.round(refreshResult.weather.humidity)}%</p>
+                      )}
+                    </div>
+                  )}
+
+                  {refreshResult.yoto && refreshResult.yoto.jobId && (
+                    <div className={styles.yotoJobStatus}>
+                      <h4>📱 Yoto Processing</h4>
+                      <p><strong>Job ID:</strong> {refreshResult.yoto.jobId}</p>
+                      <p><strong>Card ID:</strong> {refreshResult.yoto.cardId}</p>
+                      <p><strong>Status:</strong> {jobStatus ? (
+                        <span>
+                          {jobStatus.status === 'queued' && '⏳ Queued'}
+                          {jobStatus.status === 'processing' && '🔄 Processing'}
+                          {jobStatus.status === 'completed' && '✅ Completed'}
+                          {jobStatus.status === 'failed' && '❌ Failed'}
+                        </span>
+                      ) : refreshResult.yoto.status}</p>
+                      {jobStatus && jobStatus.progress && (
+                        <p><strong>Progress:</strong> {jobStatus.progress.completed || 0} / {jobStatus.progress.total || 0} tracks</p>
+                      )}
+                      {jobStatus && jobStatus.status === 'completed' && (
+                        <p className={styles.completedNote}>
+                          ✅ <strong>TTS generation complete!</strong> Your refreshed card is ready in your Yoto library.
+                        </p>
+                      )}
+                    </div>
+                  )}
+
+                  {refreshResult.deviceDeployment && (
+                    <div className={styles.deviceDeployment}>
+                      <h4>📡 Device Deployment</h4>
+                      <p>
+                        <strong>Deployed:</strong> {refreshResult.deviceDeployment.success} of {refreshResult.deviceDeployment.total} device(s)
+                      </p>
+                      {refreshResult.deviceDeployment.success > 0 && (
+                        <p className={styles.deploymentSuccess}>
+                          ✅ Playlist has been sent to your device(s)!
+                        </p>
+                      )}
+                    </div>
+                  )}
+
+                  {refreshResult.note && (
+                    <div className={styles.infoNote}>
+                      <p>ℹ️ {refreshResult.note}</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
 
             {result && (
               <div className={styles.success}>

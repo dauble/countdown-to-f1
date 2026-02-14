@@ -1,0 +1,217 @@
+// API Route to refresh MYO playlist from Cloudflare Worker data
+// This endpoint fetches fresh F1 data from the Cloudflare worker and updates
+// the existing MYO card with new TTS content
+
+import { createTextToSpeechPlaylist, buildF1Chapters, deployToAllDevices, checkJobStatus } from "@/services/yotoService";
+import { uploadCardIcon, uploadCountryFlagIcon } from "@/utils/imageUtils";
+import { getAccessToken, getStoredCardId, storeCardId, isAuthError, createAuthErrorResponse } from "@/utils/authUtils";
+
+/**
+ * Refresh MYO playlist with latest data from Cloudflare Worker
+ * This creates a NEW TTS playlist (Labs API limitation) but the user can link it to their MYO card
+ * 
+ * Unlike regular generation, this specifically uses the Cloudflare Worker as the data source
+ * to ensure the most up-to-date information is used for the refresh
+ */
+export async function POST(request) {
+  try {
+    // Step 1: Check authentication
+    const accessToken = getAccessToken();
+    if (!accessToken) {
+      return Response.json(
+        { error: "Not authenticated. Please connect with Yoto first.", needsAuth: true },
+        { status: 401 }
+      );
+    }
+
+    // Step 2: Get Cloudflare Worker URL from environment
+    const workerUrl = process.env.CLOUDFLARE_WORKER_URL;
+    if (!workerUrl) {
+      return Response.json(
+        { 
+          error: "Cloudflare Worker URL not configured. Please set CLOUDFLARE_WORKER_URL environment variable.",
+          hint: "Example: https://f1-yoto-myo-worker.dauble2k5.workers.dev"
+        },
+        { status: 400 }
+      );
+    }
+
+    console.log('Refreshing MYO playlist from Cloudflare Worker:', workerUrl);
+
+    // Step 3: Fetch fresh data from Cloudflare Worker
+    let workerData;
+    try {
+      const workerResponse = await fetch(`${workerUrl}/playlist`, {
+        signal: AbortSignal.timeout(10000)
+      });
+
+      if (!workerResponse.ok) {
+        throw new Error(`Worker returned ${workerResponse.status}: ${workerResponse.statusText}`);
+      }
+
+      workerData = await workerResponse.json();
+      console.log(`Fetched fresh data from worker, last updated: ${workerData.lastUpdated}`);
+    } catch (error) {
+      console.error('Failed to fetch from Cloudflare Worker:', error);
+      return Response.json(
+        {
+          error: "Failed to fetch fresh data from Cloudflare Worker",
+          details: error.message,
+          workerUrl: workerUrl
+        },
+        { status: 502 }
+      );
+    }
+
+    // Step 4: Extract race, sessions, and weather data
+    const raceData = workerData.race;
+    const sessions = workerData.sessions || [];
+    const weather = workerData.weather || null;
+
+    // Step 5: Format dates and times (convert from ISO strings)
+    // The worker stores ISO timestamps, we need to format them for TTS
+    if (raceData.dateStart) {
+      const raceDate = new Date(raceData.dateStart);
+      raceData.date = raceDate.toLocaleDateString('en-US', {
+        weekday: 'long',
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric',
+        timeZone: 'UTC'
+      });
+      raceData.time = raceDate.toLocaleTimeString('en-US', {
+        hour: '2-digit',
+        minute: '2-digit',
+        timeZoneName: 'short',
+        timeZone: 'UTC'
+      });
+    }
+
+    // Format session times
+    const formattedSessions = sessions.map(session => {
+      if (session.dateStart) {
+        const sessionDate = new Date(session.dateStart);
+        return {
+          ...session,
+          date: sessionDate.toLocaleDateString('en-US', {
+            weekday: 'long',
+            year: 'numeric',
+            month: 'long',
+            day: 'numeric',
+            timeZone: 'UTC'
+          }),
+          time: sessionDate.toLocaleTimeString('en-US', {
+            hour: '2-digit',
+            minute: '2-digit',
+            timeZoneName: 'short',
+            timeZone: 'UTC'
+          })
+        };
+      }
+      return session;
+    });
+
+    // Step 6: Upload custom icon if available
+    const iconMediaId = await uploadCardIcon(accessToken);
+
+    // Step 7: Upload country flag icon if available
+    let countryFlagIconId = null;
+    if (raceData.countryFlag) {
+      countryFlagIconId = await uploadCountryFlagIcon(raceData.countryFlag, accessToken, raceData.country);
+    }
+
+    // Step 8: Build chapters with fresh data
+    const chapters = buildF1Chapters(raceData, formattedSessions, iconMediaId, weather, countryFlagIconId);
+
+    // Step 9: Get stored card ID (if exists)
+    const existingCardId = getStoredCardId();
+    
+    // Step 10: Create TTS playlist
+    // Note: Labs TTS API always creates a NEW playlist, even if cardId is provided
+    // This is a Yoto API limitation - we track the cardId but each refresh creates a new card
+    const title = `F1: ${raceData.name}`;
+    const yotoResult = await createTextToSpeechPlaylist({
+      title,
+      chapters,
+      accessToken,
+      cardId: existingCardId, // Track for reference, but new playlist will be created
+    });
+
+    // Store the new card ID
+    if (yotoResult.cardId) {
+      storeCardId(yotoResult.cardId);
+    }
+
+    // Step 11: Deploy to all devices
+    let deploymentResult = null;
+    if (yotoResult.cardId && yotoResult.status !== 'failed') {
+      try {
+        // Wait for the TTS job to complete before deploying
+        let jobStatus = yotoResult.status;
+        let attempts = 0;
+        const maxAttempts = 60; // 60 seconds max wait
+
+        while (jobStatus !== 'completed' && jobStatus !== 'failed' && attempts < maxAttempts) {
+          await new Promise(resolve => setTimeout(resolve, 1000));
+          const statusCheck = await checkJobStatus(yotoResult.jobId, accessToken);
+          jobStatus = statusCheck.status;
+          attempts++;
+        }
+
+        if (jobStatus === 'completed') {
+          deploymentResult = await deployToAllDevices(yotoResult.cardId, accessToken);
+          console.log('Deployed to devices:', deploymentResult);
+        }
+      } catch (error) {
+        console.error('Deployment error (non-fatal):', error);
+      }
+    }
+
+    // Step 12: Return success with playlist info
+    return Response.json({
+      success: true,
+      message: "MYO playlist refreshed successfully! A new playlist has been created with the latest F1 data.",
+      yoto: {
+        jobId: yotoResult.jobId,
+        cardId: yotoResult.cardId,
+        status: yotoResult.status,
+        isNewPlaylist: true, // Always true for TTS API
+      },
+      race: {
+        name: raceData.name,
+        location: raceData.location,
+        country: raceData.country,
+        date: raceData.date,
+        time: raceData.time,
+      },
+      sessions: formattedSessions.map(s => ({
+        name: s.sessionName,
+        date: s.date,
+        time: s.time,
+      })),
+      weather: weather,
+      dataSource: {
+        type: 'cloudflare-worker',
+        url: workerUrl,
+        lastUpdated: workerData.lastUpdated,
+      },
+      deviceDeployment: deploymentResult,
+      note: "Due to Yoto Labs TTS API limitations, a new playlist is created each time. You may want to delete old playlists from your library.",
+    });
+
+  } catch (error) {
+    console.error('MYO playlist refresh error:', error);
+
+    if (isAuthError(error)) {
+      return createAuthErrorResponse();
+    }
+
+    return Response.json(
+      {
+        error: error.message || "Failed to refresh MYO playlist",
+        details: error.stack,
+      },
+      { status: 500 }
+    );
+  }
+}
