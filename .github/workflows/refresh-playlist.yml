@@ -1,5 +1,8 @@
 name: Refresh F1 Yoto Playlist
 
+permissions:
+  contents: read
+
 # This workflow automatically refreshes your F1 Yoto playlist with the latest data
 # from the Cloudflare Worker. It runs on a schedule and can also be triggered manually.
 
