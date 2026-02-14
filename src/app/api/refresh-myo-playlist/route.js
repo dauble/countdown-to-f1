@@ -3,8 +3,8 @@
 // the existing MYO card with new TTS content
 
 import { createTextToSpeechPlaylist, buildF1Chapters, deployToAllDevices, checkJobStatus } from "@/services/yotoService";
-import { uploadCardIcon, uploadCountryFlagIcon } from "@/utils/imageUtils";
-import { getAccessToken, getStoredCardId, storeCardId, isAuthError, createAuthErrorResponse } from "@/utils/authUtils";
+import { uploadCardIcon, uploadCountryFlagIcon, uploadCardCoverImage } from "@/utils/imageUtils";
+import { getAccessToken, getStoredCardId, storeCardId, getStoredPlaylistTitle, storePlaylistTitle, isAuthError, createAuthErrorResponse } from "@/utils/authUtils";
 
 /**
  * Refresh MYO playlist with latest data from Cloudflare Worker
@@ -120,29 +120,39 @@ export async function POST(request) {
       countryFlagIconId = await uploadCountryFlagIcon(raceData.countryFlag, accessToken, raceData.country);
     }
 
-    // Step 8: Build chapters with fresh data
+    // Step 8: Upload cover image if available
+    const coverImageUrl = await uploadCardCoverImage(accessToken);
+
+    // Step 9: Build chapters with fresh data
     const chapters = buildF1Chapters(raceData, formattedSessions, iconMediaId, weather, countryFlagIconId);
 
-    // Step 9: Get stored card ID (if exists)
+    // Step 10: Get stored card ID and playlist title (if exists)
     const existingCardId = getStoredCardId();
+    const storedTitle = getStoredPlaylistTitle();
     
-    // Step 10: Create TTS playlist
+    // Step 11: Use stored title if available, otherwise generate new title
+    const title = storedTitle || `F1: ${raceData.name}`;
+    console.log(`Using playlist title: "${title}" (stored: ${!!storedTitle})`);
+    
+    // Step 12: Create TTS playlist
     // Note: Labs TTS API always creates a NEW playlist, even if cardId is provided
     // This is a Yoto API limitation - we track the cardId but each refresh creates a new card
-    const title = `F1: ${raceData.name}`;
     const yotoResult = await createTextToSpeechPlaylist({
       title,
       chapters,
       accessToken,
       cardId: existingCardId, // Track for reference, but new playlist will be created
+      coverImageUrl,
     });
 
-    // Store the new card ID
+    // Store the new card ID and title
     if (yotoResult.cardId) {
       storeCardId(yotoResult.cardId);
+      storePlaylistTitle(title);
+      console.log(`Stored new card ID: ${yotoResult.cardId} and title: "${title}"`);
     }
 
-    // Step 11: Deploy to all devices
+    // Step 13: Deploy to all devices
     let deploymentResult = null;
     if (yotoResult.cardId && yotoResult.status !== 'failed') {
       try {
@@ -167,7 +177,7 @@ export async function POST(request) {
       }
     }
 
-    // Step 12: Return success with playlist info
+    // Step 14: Return success with playlist info
     return Response.json({
       success: true,
       message: "MYO playlist refreshed successfully! A new playlist has been created with the latest F1 data.",

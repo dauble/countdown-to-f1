@@ -1,11 +1,12 @@
 // Yoto Logout
-import { clearTokens, storeCardId, storeMyoCardId } from "@/utils/authUtils";
+import { clearTokens, storeCardId, storeMyoCardId, storePlaylistTitle } from "@/utils/authUtils";
 
 export async function POST() {
   try {
     clearTokens();
     storeCardId(null);
     storeMyoCardId(null);
+    storePlaylistTitle(null);
     return Response.json({ success: true, message: "Logged out successfully" });
   } catch (error) {
     console.error("Logout error:", error);
@@ -18,6 +19,7 @@ export async function GET() {
     clearTokens();
     storeCardId(null);
     storeMyoCardId(null);
+    storePlaylistTitle(null);
     return Response.json({ success: true, message: "Logged out successfully" });
   } catch (error) {
     console.error("Logout error:", error);

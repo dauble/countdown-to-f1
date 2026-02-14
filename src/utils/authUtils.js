@@ -85,6 +85,24 @@ export function storeMyoCardId(cardId) {
 }
 
 /**
+ * Get stored playlist title
+ */
+export function getStoredPlaylistTitle() {
+  return config.get("f1PlaylistTitle");
+}
+
+/**
+ * Store playlist title for future updates
+ */
+export function storePlaylistTitle(title) {
+  if (title === null) {
+    config.delete("f1PlaylistTitle");
+  } else {
+    config.set("f1PlaylistTitle", title);
+  }
+}
+
+/**
  * Handle authentication errors consistently
  * @param {Error} error - The error object
  * @returns {boolean} - True if it's an authentication error

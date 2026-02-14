@@ -3,8 +3,8 @@
 // Uses a secret token for authentication
 
 import { createTextToSpeechPlaylist, buildF1Chapters, deployToAllDevices } from "@/services/yotoService";
-import { uploadCardIcon, uploadCountryFlagIcon } from "@/utils/imageUtils";
-import { getAccessToken, getStoredCardId, storeCardId } from "@/utils/authUtils";
+import { uploadCardIcon, uploadCountryFlagIcon, uploadCardCoverImage } from "@/utils/imageUtils";
+import { getAccessToken, getStoredCardId, storeCardId, getStoredPlaylistTitle, storePlaylistTitle } from "@/utils/authUtils";
 
 /**
  * Webhook endpoint for automated playlist refresh
@@ -133,24 +133,36 @@ export async function POST(request) {
       countryFlagIconId = await uploadCountryFlagIcon(raceData.countryFlag, accessToken, raceData.country);
     }
 
-    // Step 7: Build chapters
+    // Step 7: Upload cover image if available
+    const coverImageUrl = await uploadCardCoverImage(accessToken);
+
+    // Step 8: Build chapters
     const chapters = buildF1Chapters(raceData, formattedSessions, iconMediaId, weather, countryFlagIconId);
 
-    // Step 8: Create TTS playlist
+    // Step 9: Get stored card ID and playlist title (if exists)
     const existingCardId = getStoredCardId();
-    const title = `F1: ${raceData.name}`;
+    const storedTitle = getStoredPlaylistTitle();
+    
+    // Use stored title if available, otherwise generate new title
+    const title = storedTitle || `F1: ${raceData.name}`;
+    console.log(`[Webhook] Using playlist title: "${title}" (stored: ${!!storedTitle})`);
+    
+    // Step 10: Create TTS playlist
     const yotoResult = await createTextToSpeechPlaylist({
       title,
       chapters,
       accessToken,
       cardId: existingCardId,
+      coverImageUrl,
     });
 
     if (yotoResult.cardId) {
       storeCardId(yotoResult.cardId);
+      storePlaylistTitle(title);
+      console.log(`[Webhook] Stored new card ID: ${yotoResult.cardId} and title: "${title}"`);
     }
 
-    // Step 9: Deploy to devices (best effort, don't fail on error)
+    // Step 11: Deploy to devices (best effort, don't fail on error)
     let deploymentResult = null;
     if (yotoResult.cardId && yotoResult.status !== 'failed') {
       try {
@@ -161,7 +173,7 @@ export async function POST(request) {
       }
     }
 
-    // Step 10: Return success
+    // Step 12: Return success
     return Response.json({
       success: true,
       message: "Automated playlist refresh completed successfully",

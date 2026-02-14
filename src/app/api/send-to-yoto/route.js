@@ -1,7 +1,7 @@
 // API Route to send generated card data to Yoto
 import { createTextToSpeechPlaylist, deployToAllDevices } from "@/services/yotoService";
 import { uploadCardCoverImage } from "@/utils/imageUtils";
-import { getAccessToken, storeCardId, isAuthError, createAuthErrorResponse } from "@/utils/authUtils";
+import { getAccessToken, storeCardId, storePlaylistTitle, isAuthError, createAuthErrorResponse } from "@/utils/authUtils";
 
 export async function POST(request) {
   try {
@@ -41,10 +41,11 @@ export async function POST(request) {
       coverImageUrl,
     });
 
-    // Store the newly created card ID for future reference
+    // Store the newly created card ID and title for future reference
     if (yotoResult.cardId) {
       storeCardId(yotoResult.cardId);
-      console.log(`Stored new card ID: ${yotoResult.cardId}`);
+      storePlaylistTitle(title);
+      console.log(`Stored new card ID: ${yotoResult.cardId} and title: "${title}"`);
     }
 
     // Step 5: Deploy the playlist to all devices
