@@ -1,7 +1,5 @@
 // Yoto OAuth Callback
-import Configstore from "configstore";
-
-const config = new Configstore("yoto-f1-card-tokens");
+import { storeTokens } from "@/utils/authUtils";
 
 export async function GET(request) {
   const url = new URL(request.url);
@@ -53,13 +51,4 @@ export async function GET(request) {
   }
 }
 
-function storeTokens(accessToken, refreshToken) {
-  config.set("tokens", {
-    accessToken,
-    refreshToken,
-  });
-}
 
-export function getStoredTokens() {
-  return config.get("tokens");
-}

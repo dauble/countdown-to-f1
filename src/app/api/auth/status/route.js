@@ -1,12 +1,10 @@
 // Check authentication status
-import Configstore from "configstore";
-
-const config = new Configstore("yoto-f1-card-tokens");
+import { getAccessToken } from "@/utils/authUtils";
 
 export async function GET() {
   try {
-    const tokens = config.get("tokens");
-    const isAuthenticated = !!(tokens && tokens.accessToken);
+    const accessToken = getAccessToken();
+    const isAuthenticated = !!accessToken;
     
     return Response.json({
       authenticated: isAuthenticated,

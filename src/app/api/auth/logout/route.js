@@ -1,13 +1,11 @@
 // Yoto Logout
-import Configstore from "configstore";
-
-const config = new Configstore("yoto-f1-card-tokens");
+import { clearTokens, storeCardId, storeMyoCardId } from "@/utils/authUtils";
 
 export async function POST() {
   try {
-    config.delete("tokens");
-    config.delete("f1CardId");
-    config.delete("f1MyoCardId");
+    clearTokens();
+    storeCardId(null);
+    storeMyoCardId(null);
     return Response.json({ success: true, message: "Logged out successfully" });
   } catch (error) {
     console.error("Logout error:", error);
@@ -17,9 +15,9 @@ export async function POST() {
 
 export async function GET() {
   try {
-    config.delete("tokens");
-    config.delete("f1CardId");
-    config.delete("f1MyoCardId");
+    clearTokens();
+    storeCardId(null);
+    storeMyoCardId(null);
     return Response.json({ success: true, message: "Logged out successfully" });
   } catch (error) {
     console.error("Logout error:", error);
