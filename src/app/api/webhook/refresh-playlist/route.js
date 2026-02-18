@@ -4,7 +4,7 @@
 
 import { createTextToSpeechPlaylist, buildF1Chapters, deployToAllDevices } from "@/services/yotoService";
 import { uploadCardIcon, uploadCountryFlagIcon, uploadCardCoverImage } from "@/utils/imageUtils";
-import { getAccessToken, getStoredCardId, storeCardId, getStoredPlaylistTitle, storePlaylistTitle } from "@/utils/authUtils";
+import { getAccessToken, refreshAccessToken, getStoredTokens, getStoredCardId, storeCardId, getStoredPlaylistTitle, storePlaylistTitle } from "@/utils/authUtils";
 
 /**
  * Webhook endpoint for automated playlist refresh
@@ -39,12 +39,30 @@ export async function POST(request) {
     }
 
     // Step 2: Check authentication (stored access token)
-    const accessToken = getAccessToken();
+    let accessToken = getAccessToken();
     if (!accessToken) {
       return Response.json(
         { error: "Not authenticated. User must connect with Yoto first." },
         { status: 401 }
       );
+    }
+
+    // Refresh the access token to ensure it's still valid (tokens expire daily)
+    const refreshedToken = await refreshAccessToken();
+    if (refreshedToken) {
+      accessToken = refreshedToken;
+      console.log('[Webhook] Access token refreshed successfully');
+    } else {
+      const storedTokens = getStoredTokens();
+      if (storedTokens?.refreshToken) {
+        // Refresh token was available but refresh failed — token may be revoked
+        console.error('[Webhook] Token refresh failed with an existing refresh token');
+        return Response.json(
+          { error: "Failed to refresh authentication token. Please reconnect with Yoto." },
+          { status: 401 }
+        );
+      }
+      console.log('[Webhook] No refresh token available, using existing access token');
     }
 
     // Step 3: Get Cloudflare Worker URL

@@ -103,6 +103,51 @@ export function storePlaylistTitle(title) {
 }
 
 /**
+ * Refresh the access token using the stored refresh token
+ * @returns {Promise<string|null>} New access token, or null if refresh failed
+ */
+export async function refreshAccessToken() {
+  const tokens = getStoredTokens();
+  if (!tokens || !tokens.refreshToken) {
+    console.log('[Auth] No refresh token available');
+    return null;
+  }
+
+  try {
+    const response = await fetch('https://login.yotoplay.com/oauth/token', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
+      body: new URLSearchParams({
+        grant_type: 'refresh_token',
+        client_id: process.env.YOTO_CLIENT_ID,
+        client_secret: process.env.YOTO_CLIENT_SECRET,
+        refresh_token: tokens.refreshToken,
+      }),
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('[Auth] Token refresh failed:', response.status, errorText);
+      return null;
+    }
+
+    const newTokens = await response.json();
+    const usedRefreshToken = newTokens.refresh_token || tokens.refreshToken;
+    if (!newTokens.refresh_token) {
+      console.log('[Auth] No new refresh token returned, retaining existing refresh token');
+    }
+    storeTokens(newTokens.access_token, usedRefreshToken);
+    console.log('[Auth] Access token refreshed successfully');
+    return newTokens.access_token;
+  } catch (error) {
+    console.error('[Auth] Token refresh error:', error);
+    return null;
+  }
+}
+
+/**
  * Handle authentication errors consistently
  * @param {Error} error - The error object
  * @returns {boolean} - True if it's an authentication error
