@@ -2,9 +2,9 @@
 // This endpoint can be called by external services (e.g., cron jobs, CI/CD) to trigger playlist updates
 // Uses a secret token for authentication
 
-import { createTextToSpeechPlaylist, buildF1Chapters, deployToAllDevices } from "@/services/yotoService";
+import { createOrUpdateTTSPlaylist, buildF1Chapters, deployToAllDevices } from "@/services/yotoService";
 import { uploadCardIcon, uploadCountryFlagIcon, uploadCardCoverImage } from "@/utils/imageUtils";
-import { getAccessToken, refreshAccessToken, getStoredTokens, getStoredCardId, storeCardId, getStoredPlaylistTitle, storePlaylistTitle } from "@/utils/authUtils";
+import { getAccessToken, refreshAccessToken, getStoredTokens, getStoredCardId, storeCardId, getStoredPlaylistTitle, storePlaylistTitle, getStoredDataHash, storeDataHash } from "@/utils/authUtils";
 
 /**
  * Webhook endpoint for automated playlist refresh
@@ -98,6 +98,28 @@ export async function POST(request) {
       );
     }
 
+    // Step 4b: Skip expensive TTS generation if the F1 data hasn't changed
+    // The worker embeds a SHA-256 hash of race+session fields in its payload.
+    // We compare it against the hash from the last successful update we ran.
+    const newDataHash = workerData.dataHash;
+    if (newDataHash) {
+      const storedHash = getStoredDataHash();
+      if (storedHash && storedHash === newDataHash) {
+        console.log('[Webhook] No data changes detected — skipping TTS generation, dataHash:', newDataHash);
+        return Response.json({
+          success: true,
+          skipped: true,
+          reason: 'OpenF1 data is unchanged since the last update. No TTS regeneration needed.',
+          dataSource: {
+            url: workerUrl,
+            lastUpdated: workerData.lastUpdated,
+            dataHash: newDataHash,
+          },
+          timestamp: new Date().toISOString(),
+        });
+      }
+    }
+
     // Step 5: Extract and format race data
     const raceData = workerData.race;
     const sessions = workerData.sessions || [];
@@ -165,8 +187,10 @@ export async function POST(request) {
     const title = storedTitle || `F1: ${raceData.name}`;
     console.log(`[Webhook] Using playlist title: "${title}" (stored: ${!!storedTitle})`);
     
-    // Step 10: Create TTS playlist
-    const yotoResult = await createTextToSpeechPlaylist({
+    // Step 10: Create or update TTS playlist using ElevenLabs + Yoto audio upload.
+    // When existingCardId is present the current card is updated in-place instead of
+    // creating a new playlist (which was the limitation of the Yoto Labs TTS API).
+    const yotoResult = await createOrUpdateTTSPlaylist({
       title,
       chapters,
       accessToken,
@@ -178,6 +202,12 @@ export async function POST(request) {
       storeCardId(yotoResult.cardId);
       storePlaylistTitle(title);
       console.log(`[Webhook] Stored new card ID: ${yotoResult.cardId} and title: "${title}"`);
+    }
+
+    // Persist the data hash so the next run can skip if nothing has changed
+    if (newDataHash) {
+      storeDataHash(newDataHash);
+      console.log('[Webhook] Stored data hash:', newDataHash);
     }
 
     // Step 11: Deploy to devices (best effort, don't fail on error)
@@ -194,7 +224,9 @@ export async function POST(request) {
     // Step 12: Return success
     return Response.json({
       success: true,
-      message: "Automated playlist refresh completed successfully",
+      message: yotoResult.isUpdate
+        ? "Automated playlist refresh completed successfully (existing playlist updated)"
+        : "Automated playlist refresh completed successfully (new playlist created)",
       timestamp: new Date().toISOString(),
       race: {
         name: raceData.name,
