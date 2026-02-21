@@ -255,7 +255,8 @@ Want your MYO card to automatically fetch fresh F1 data every time it's played? 
 
 ### Quick Setup
 
-1. **Deploy the Worker** (see [cloudflare-worker/DEPLOYMENT.md](cloudflare-worker/DEPLOYMENT.md) for full instructions)
+1. **Deploy the Worker** (see [documentation/CLOUDFLARE_DEPLOYMENT.md](documentation/CLOUDFLARE_DEPLOYMENT.md) for full instructions)
+
    ```bash
    cd cloudflare-worker
    npm install -g wrangler
@@ -264,10 +265,11 @@ Want your MYO card to automatically fetch fresh F1 data every time it's played? 
    ```
 
 2. **Configure Your App** (add to `.env`)
+
    ```env
    USE_CLOUDFLARE_WORKER=true
    CLOUDFLARE_WORKER_URL=https://f1-yoto-myo-worker.dauble2k5.workers.dev
-   
+
    # Optional: For automated webhook refresh
    WEBHOOK_SECRET=your_random_secret_here
    ```
@@ -276,7 +278,7 @@ Want your MYO card to automatically fetch fresh F1 data every time it's played? 
    - **Manual**: Click "🔄 Refresh Playlist from Worker" button in the UI
    - **Automated**: Set up a cron job to call the webhook endpoint daily
 
-For detailed setup instructions, see the [Cloudflare Worker README](cloudflare-worker/README.md), [Deployment Guide](cloudflare-worker/DEPLOYMENT.md), and [Auto-Refresh Feature Guide](documentation/AUTO_REFRESH_FEATURE.md).
+For detailed setup instructions, see the [Cloudflare Worker README](documentation/CLOUDFLARE_WORKER.md), [Deployment Guide](documentation/CLOUDFLARE_DEPLOYMENT.md), and [Auto-Refresh Feature Guide](documentation/AUTO_REFRESH_FEATURE.md).
 
 ## 📄 License
 
@@ -284,14 +286,19 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ## 📝 Documentation
 
+All documentation lives in the [`/documentation`](documentation/README.md) directory. Key guides:
+
 - [Quick Start Guide](documentation/QUICKSTART.md) - Get up and running in 5 minutes
-- [Changelog](documentation/CHANGELOG.md) - Version history and release notes
+- [Features Guide](documentation/FEATURES.md) - Overview of all features
+- [Cloudflare Worker](documentation/CLOUDFLARE_WORKER.md) - Auto-refresh setup with Cloudflare Workers
+- [Cloudflare Deployment](documentation/CLOUDFLARE_DEPLOYMENT.md) - Step-by-step deployment guide
+- [Auto-Refresh Feature](documentation/AUTO_REFRESH_FEATURE.md) - Automatic playlist updates
 - [Session Chapters Feature](documentation/SESSIONS_CHAPTERS_FEATURE.md) - How multi-session chapters work
 - [Cover Image Feature](documentation/COVER_IMAGE_FEATURE.md) - Custom cover image setup
 - [Job Status Feature](documentation/JOB_STATUS_FEATURE.md) - Real-time TTS status polling
 - [MYO Upload Feature](documentation/MYO_UPLOAD_FEATURE.md) - Audio file upload guide
-- [Auto-Refresh Feature](documentation/AUTO_REFRESH_FEATURE.md) - Automatic playlist updates from Cloudflare Worker
-- [Cloudflare Worker](cloudflare-worker/README.md) - Auto-refresh setup with Cloudflare Workers
+- [Implementation Summary](documentation/IMPLEMENTATION_SUMMARY.md) - Auto-refresh implementation details
+- [Changelog](documentation/CHANGELOG.md) - Version history and release notes
 - [Contributing Guide](documentation/CONTRIBUTING.md) - How to contribute to the project
 
 ## 🙏 Acknowledgments
