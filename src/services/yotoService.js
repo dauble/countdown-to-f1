@@ -1,11 +1,15 @@
 // Yoto API Service for creating MYO cards
-// API Documentation: https://yoto.dev/myo/labs-tts/
+// TTS: ElevenLabs API (https://elevenlabs.io/docs/api-reference/text-to-speech) generates audio
+// which is then uploaded to Yoto via the standard media upload flow, enabling in-place card updates.
 
 import { getCircuitTypeDescription } from "@/utils/circuitUtils";
 
 const YOTO_LABS_API_BASE = "https://labs.api.yotoplay.com";
 const YOTO_API_BASE = "https://api.yotoplay.com";
+const ELEVENLABS_API_BASE = "https://api.elevenlabs.io/v1";
 const DEFAULT_VOICE_ID = "JBFqnCBsd6RMkjVDRZzb"; // ElevenLabs voice ID
+// eleven_multilingual_v2 supports up to 5000 chars per request and high-quality output
+const DEFAULT_ELEVENLABS_MODEL = "eleven_multilingual_v2";
 
 /**
  * Custom error class for Yoto API errors that includes HTTP status
@@ -188,6 +192,197 @@ export async function createTextToSpeechPlaylist({
 
   } catch (error) {
     console.error("Yoto TTS playlist creation error:", error);
+    throw error;
+  }
+}
+
+/**
+ * Generate audio from text using the ElevenLabs API directly.
+ * Returns an MP3 Buffer that can be uploaded to Yoto via the standard media upload flow,
+ * which allows in-place card updates (unlike the Yoto Labs TTS API which always creates
+ * a new playlist).
+ *
+ * @param {string} text - Text to convert to speech
+ * @param {string} voiceId - ElevenLabs voice ID
+ * @param {string} modelId - ElevenLabs model ID (default: eleven_multilingual_v2)
+ * @returns {Promise<Buffer>} MP3 audio buffer
+ */
+async function generateElevenLabsAudio(text, voiceId = DEFAULT_VOICE_ID, modelId = DEFAULT_ELEVENLABS_MODEL) {
+  const apiKey = process.env.ELEVENLABS_API_KEY;
+  if (!apiKey) {
+    throw new Error(
+      'ELEVENLABS_API_KEY environment variable is required. ' +
+      'Get a free API key at https://elevenlabs.io/'
+    );
+  }
+
+  const response = await fetch(
+    `${ELEVENLABS_API_BASE}/text-to-speech/${voiceId}`,
+    {
+      method: 'POST',
+      headers: {
+        'xi-api-key': apiKey,
+        'Content-Type': 'application/json',
+        'Accept': 'audio/mpeg',
+      },
+      body: JSON.stringify({
+        text,
+        model_id: modelId,
+        voice_settings: {
+          stability: 0.5,
+          similarity_boost: 0.75,
+        },
+      }),
+    }
+  );
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new YotoApiError(`ElevenLabs TTS generation failed: ${errorText}`, response.status);
+  }
+
+  return Buffer.from(await response.arrayBuffer());
+}
+
+/**
+ * Create or update a Yoto playlist using ElevenLabs TTS + the standard Yoto audio upload flow.
+ *
+ * Unlike createTextToSpeechPlaylist (which uses the Yoto Labs TTS API and always creates a new
+ * playlist), this function:
+ *   1. Generates an MP3 for every chapter track via the ElevenLabs API.
+ *   2. Uploads each MP3 to Yoto with requestAudioUploadUrl / uploadAudioFile / waitForTranscoding.
+ *   3. POSTs the assembled card content to the regular Yoto content API.
+ *      When cardId is supplied the existing card is updated in-place; otherwise a new card is created.
+ *
+ * Requires the ELEVENLABS_API_KEY environment variable.
+ *
+ * @param {Object} params
+ * @param {string} params.title - Card/playlist title
+ * @param {Array}  params.chapters - Chapter array from buildF1Chapters()
+ * @param {string} params.accessToken - Yoto OAuth access token
+ * @param {string} [params.cardId] - Existing card ID to update; omit to create a new card
+ * @param {string} [params.voiceId] - ElevenLabs voice ID (default: DEFAULT_VOICE_ID)
+ * @param {string} [params.coverImageUrl] - Cover image media URL
+ * @returns {Promise<Object>} Result with cardId, status, and isUpdate flag
+ */
+export async function createOrUpdateTTSPlaylist({
+  title,
+  chapters,
+  accessToken,
+  cardId = null,
+  voiceId = DEFAULT_VOICE_ID,
+  coverImageUrl = null,
+}) {
+  try {
+    console.log(
+      `${cardId ? 'Updating' : 'Creating'} Yoto playlist via ElevenLabs TTS + audio upload.`,
+      `Chapters: ${chapters.length}${cardId ? `, existing cardId: ${cardId}` : ''}`
+    );
+
+    // Build each chapter by generating audio for every track and uploading it to Yoto
+    const processedChapters = [];
+
+    for (let ci = 0; ci < chapters.length; ci++) {
+      const chapter = chapters[ci];
+      const processedTracks = [];
+
+      for (let ti = 0; ti < chapter.tracks.length; ti++) {
+        const track = chapter.tracks[ti];
+
+        // 1. Generate MP3 via ElevenLabs
+        console.log(`Generating audio for chapter ${ci + 1} track ${ti + 1}: "${track.title}"`);
+        const audioBuffer = await generateElevenLabsAudio(
+          track.text,
+          track.voiceId || voiceId
+        );
+
+        // 2. Upload to Yoto and wait for transcoding
+        const { uploadUrl, uploadId } = await requestAudioUploadUrl(accessToken);
+        await uploadAudioFile(uploadUrl, audioBuffer, 'audio/mpeg');
+        const transcodedAudio = await waitForTranscoding(uploadId, accessToken);
+
+        const trackObj = {
+          key: String(ti + 1).padStart(2, '0'),
+          title: track.title,
+          trackUrl: `yoto:#${transcodedAudio.transcodedSha256}`,
+          duration: transcodedAudio.transcodedInfo?.duration,
+          fileSize: transcodedAudio.transcodedInfo?.fileSize,
+          channels: transcodedAudio.transcodedInfo?.channels,
+          format: transcodedAudio.transcodedInfo?.format,
+          type: 'audio',
+          overlayLabel: String(ti + 1),
+        };
+
+        if (track.icon) {
+          trackObj.display = { icon16x16: track.icon };
+        }
+
+        processedTracks.push(trackObj);
+      }
+
+      const chapterObj = {
+        key: String(ci + 1).padStart(2, '0'),
+        title: chapter.title,
+        overlayLabel: String(ci + 1),
+        tracks: processedTracks,
+      };
+
+      if (chapter.icon) {
+        chapterObj.display = { icon16x16: chapter.icon };
+      }
+
+      processedChapters.push(chapterObj);
+    }
+
+    // Assemble card content
+    const content = {
+      title: title,
+      content: { chapters: processedChapters },
+      metadata: {
+        title: title,
+        description: `F1 Update - ${new Date().toLocaleDateString()}`,
+      },
+    };
+
+    if (coverImageUrl) {
+      content.metadata.cover = { imageL: coverImageUrl };
+    }
+
+    // Include cardId to update the existing card in-place
+    if (cardId) {
+      content.cardId = cardId;
+    }
+
+    // POST to the regular Yoto content API (supports in-place updates via cardId)
+    const response = await fetch(`${YOTO_API_BASE}/content`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${accessToken}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(content),
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new YotoApiError(`Failed to create/update playlist: ${errorText}`, response.status);
+    }
+
+    const result = await response.json();
+    const resultCardId = result.cardId || cardId;
+
+    console.log(`Playlist ${cardId ? 'updated' : 'created'} successfully, cardId: ${resultCardId}`);
+
+    return {
+      cardId: resultCardId,
+      jobId: null, // No async job — audio is already uploaded and transcoded
+      status: 'completed',
+      isUpdate: !!cardId,
+      message: cardId ? 'Playlist updated successfully!' : 'Playlist created successfully!',
+    };
+
+  } catch (error) {
+    console.error('createOrUpdateTTSPlaylist error:', error);
     throw error;
   }
 }

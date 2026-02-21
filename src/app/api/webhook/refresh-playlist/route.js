@@ -2,7 +2,7 @@
 // This endpoint can be called by external services (e.g., cron jobs, CI/CD) to trigger playlist updates
 // Uses a secret token for authentication
 
-import { createTextToSpeechPlaylist, buildF1Chapters, deployToAllDevices } from "@/services/yotoService";
+import { createOrUpdateTTSPlaylist, buildF1Chapters, deployToAllDevices } from "@/services/yotoService";
 import { uploadCardIcon, uploadCountryFlagIcon, uploadCardCoverImage } from "@/utils/imageUtils";
 import { getAccessToken, refreshAccessToken, getStoredTokens, getStoredCardId, storeCardId, getStoredPlaylistTitle, storePlaylistTitle } from "@/utils/authUtils";
 
@@ -165,8 +165,10 @@ export async function POST(request) {
     const title = storedTitle || `F1: ${raceData.name}`;
     console.log(`[Webhook] Using playlist title: "${title}" (stored: ${!!storedTitle})`);
     
-    // Step 10: Create TTS playlist
-    const yotoResult = await createTextToSpeechPlaylist({
+    // Step 10: Create or update TTS playlist using ElevenLabs + Yoto audio upload.
+    // When existingCardId is present the current card is updated in-place instead of
+    // creating a new playlist (which was the limitation of the Yoto Labs TTS API).
+    const yotoResult = await createOrUpdateTTSPlaylist({
       title,
       chapters,
       accessToken,
@@ -194,7 +196,9 @@ export async function POST(request) {
     // Step 12: Return success
     return Response.json({
       success: true,
-      message: "Automated playlist refresh completed successfully",
+      message: yotoResult.isUpdate
+        ? "Automated playlist refresh completed successfully (existing playlist updated)"
+        : "Automated playlist refresh completed successfully (new playlist created)",
       timestamp: new Date().toISOString(),
       race: {
         name: raceData.name,

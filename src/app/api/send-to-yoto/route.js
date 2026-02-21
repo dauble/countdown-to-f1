@@ -1,7 +1,7 @@
 // API Route to send generated card data to Yoto
-import { createTextToSpeechPlaylist, deployToAllDevices } from "@/services/yotoService";
+import { createOrUpdateTTSPlaylist, deployToAllDevices } from "@/services/yotoService";
 import { uploadCardCoverImage } from "@/utils/imageUtils";
-import { getAccessToken, storeCardId, storePlaylistTitle, isAuthError, createAuthErrorResponse } from "@/utils/authUtils";
+import { getAccessToken, getStoredCardId, storeCardId, storePlaylistTitle, isAuthError, createAuthErrorResponse } from "@/utils/authUtils";
 
 export async function POST(request) {
   try {
@@ -30,25 +30,29 @@ export async function POST(request) {
 
     // Step 3: Upload cover image if available
     const coverImageUrl = await uploadCardCoverImage(accessToken);
-    
-    // Step 4: Create TTS playlist
-    // Note: Labs TTS API always creates new playlists, it doesn't support updating existing ones
-    const yotoResult = await createTextToSpeechPlaylist({
+
+    // Step 4: Retrieve stored card ID so we can update the existing card when present
+    const existingCardId = updateExisting ? getStoredCardId() : null;
+
+    // Step 5: Create or update TTS playlist using ElevenLabs + Yoto audio upload.
+    // When existingCardId is present the current card is updated in-place instead of
+    // creating a new playlist (which was the limitation of the Yoto Labs TTS API).
+    const yotoResult = await createOrUpdateTTSPlaylist({
       title,
       chapters,
       accessToken,
-      cardId: null, // Labs API doesn't support updates
+      cardId: existingCardId,
       coverImageUrl,
     });
 
-    // Store the newly created card ID and title for future reference
+    // Store card ID and title for future updates
     if (yotoResult.cardId) {
       storeCardId(yotoResult.cardId);
       storePlaylistTitle(title);
-      console.log(`Stored new card ID: ${yotoResult.cardId} and title: "${title}"`);
+      console.log(`Stored card ID: ${yotoResult.cardId} and title: "${title}"`);
     }
 
-    // Step 5: Deploy the playlist to all devices
+    // Step 6: Deploy the playlist to all devices
     let deviceDeployment = null;
     if (yotoResult.cardId) {
       try {
@@ -66,13 +70,15 @@ export async function POST(request) {
       }
     }
 
-    // Step 6: Return success with job information
+    // Step 7: Return success with card information
     return Response.json({
       success: true,
       yoto: yotoResult,
       deviceDeployment,
-      isUpdate: false, // Labs TTS API always creates new playlists
-      message: "Formula 1 card created successfully! Check your Yoto library.",
+      isUpdate: yotoResult.isUpdate,
+      message: yotoResult.isUpdate
+        ? "Formula 1 card updated successfully! Check your Yoto library."
+        : "Formula 1 card created successfully! Check your Yoto library.",
     });
 
   } catch (error) {

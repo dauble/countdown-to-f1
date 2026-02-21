@@ -1,17 +1,16 @@
 // API Route to refresh MYO playlist from Cloudflare Worker data
 // This endpoint fetches fresh F1 data from the Cloudflare worker and updates
-// the existing MYO card with new TTS content
+// the existing MYO card with new TTS content using ElevenLabs + Yoto audio upload.
 
-import { createTextToSpeechPlaylist, buildF1Chapters, deployToAllDevices, checkJobStatus } from "@/services/yotoService";
+import { createOrUpdateTTSPlaylist, buildF1Chapters, deployToAllDevices } from "@/services/yotoService";
 import { uploadCardIcon, uploadCountryFlagIcon, uploadCardCoverImage } from "@/utils/imageUtils";
 import { getAccessToken, getStoredCardId, storeCardId, getStoredPlaylistTitle, storePlaylistTitle, isAuthError, createAuthErrorResponse } from "@/utils/authUtils";
 
 /**
- * Refresh MYO playlist with latest data from Cloudflare Worker
- * This creates a NEW TTS playlist (Labs API limitation) but the user can link it to their MYO card
- * 
- * Unlike regular generation, this specifically uses the Cloudflare Worker as the data source
- * to ensure the most up-to-date information is used for the refresh
+ * Refresh MYO playlist with latest data from Cloudflare Worker.
+ * Uses ElevenLabs TTS + Yoto audio upload so that, when a card ID is already
+ * stored, the existing playlist is updated in-place rather than a new one being
+ * created on every refresh.
  */
 export async function POST(request) {
   try {
@@ -134,14 +133,14 @@ export async function POST(request) {
     const title = storedTitle || `F1: ${raceData.name}`;
     console.log(`Using playlist title: "${title}" (stored: ${!!storedTitle})`);
     
-    // Step 12: Create TTS playlist
-    // Note: Labs TTS API always creates a NEW playlist, even if cardId is provided
-    // This is a Yoto API limitation - we track the cardId but each refresh creates a new card
-    const yotoResult = await createTextToSpeechPlaylist({
+    // Step 12: Create or update TTS playlist using ElevenLabs + Yoto audio upload.
+    // When existingCardId is present the current card is updated in-place instead of
+    // creating a new playlist (which was the limitation of the Yoto Labs TTS API).
+    const yotoResult = await createOrUpdateTTSPlaylist({
       title,
       chapters,
       accessToken,
-      cardId: existingCardId, // Track for reference, but new playlist will be created
+      cardId: existingCardId, // Provides update-in-place when card already exists
       coverImageUrl,
     });
 
@@ -153,25 +152,12 @@ export async function POST(request) {
     }
 
     // Step 13: Deploy to all devices
+    // Audio is already uploaded and transcoded, so deployment can proceed immediately.
     let deploymentResult = null;
     if (yotoResult.cardId && yotoResult.status !== 'failed') {
       try {
-        // Wait for the TTS job to complete before deploying
-        let jobStatus = yotoResult.status;
-        let attempts = 0;
-        const maxAttempts = 60; // 60 seconds max wait
-
-        while (jobStatus !== 'completed' && jobStatus !== 'failed' && attempts < maxAttempts) {
-          await new Promise(resolve => setTimeout(resolve, 1000));
-          const statusCheck = await checkJobStatus(yotoResult.jobId, accessToken);
-          jobStatus = statusCheck.status;
-          attempts++;
-        }
-
-        if (jobStatus === 'completed') {
-          deploymentResult = await deployToAllDevices(yotoResult.cardId, accessToken);
-          console.log('Deployed to devices:', deploymentResult);
-        }
+        deploymentResult = await deployToAllDevices(yotoResult.cardId, accessToken);
+        console.log('Deployed to devices:', deploymentResult);
       } catch (error) {
         console.error('Deployment error (non-fatal):', error);
       }
@@ -180,12 +166,14 @@ export async function POST(request) {
     // Step 14: Return success with playlist info
     return Response.json({
       success: true,
-      message: "MYO playlist refreshed successfully! A new playlist has been created with the latest F1 data.",
+      message: yotoResult.isUpdate
+        ? "MYO playlist refreshed successfully! The existing playlist has been updated with the latest F1 data."
+        : "MYO playlist created successfully with the latest F1 data.",
       yoto: {
         jobId: yotoResult.jobId,
         cardId: yotoResult.cardId,
         status: yotoResult.status,
-        isNewPlaylist: true, // Always true for TTS API
+        isUpdate: yotoResult.isUpdate,
       },
       race: {
         name: raceData.name,
@@ -206,7 +194,6 @@ export async function POST(request) {
         lastUpdated: workerData.lastUpdated,
       },
       deviceDeployment: deploymentResult,
-      note: "Due to Yoto Labs TTS API limitations, a new playlist is created each time. You may want to delete old playlists from your library.",
     });
 
   } catch (error) {
