@@ -4,7 +4,7 @@
 
 import { createOrUpdateTTSPlaylist, buildF1Chapters, deployToAllDevices } from "@/services/yotoService";
 import { uploadCardIcon, uploadCountryFlagIcon, uploadCardCoverImage } from "@/utils/imageUtils";
-import { getAccessToken, getStoredCardId, storeCardId, getStoredPlaylistTitle, storePlaylistTitle, isAuthError, createAuthErrorResponse } from "@/utils/authUtils";
+import { getAccessToken, getStoredCardId, storeCardId, getStoredPlaylistTitle, storePlaylistTitle, isAuthError, createAuthErrorResponse, getStoredDataHash, storeDataHash } from "@/utils/authUtils";
 
 /**
  * Refresh MYO playlist with latest data from Cloudflare Worker.
@@ -60,6 +60,28 @@ export async function POST(request) {
         },
         { status: 502 }
       );
+    }
+
+    // Step 3b: Skip expensive TTS generation if the F1 data hasn't changed
+    // The worker embeds a SHA-256 hash of race+session fields in its payload.
+    // We compare it against the hash from the last successful update we ran.
+    const newDataHash = workerData.dataHash;
+    if (newDataHash) {
+      const storedHash = getStoredDataHash();
+      if (storedHash && storedHash === newDataHash) {
+        console.log('No data changes detected — skipping TTS generation, dataHash:', newDataHash);
+        return Response.json({
+          success: true,
+          skipped: true,
+          reason: 'OpenF1 data is unchanged since the last update. No TTS regeneration needed.',
+          dataSource: {
+            type: 'cloudflare-worker',
+            url: workerUrl,
+            lastUpdated: workerData.lastUpdated,
+            dataHash: newDataHash,
+          },
+        });
+      }
     }
 
     // Step 4: Extract race, sessions, and weather data
@@ -149,6 +171,12 @@ export async function POST(request) {
       storeCardId(yotoResult.cardId);
       storePlaylistTitle(title);
       console.log(`Stored new card ID: ${yotoResult.cardId} and title: "${title}"`);
+    }
+
+    // Persist the data hash so the next run can skip if nothing has changed
+    if (newDataHash) {
+      storeDataHash(newDataHash);
+      console.log('Stored data hash:', newDataHash);
     }
 
     // Step 13: Deploy to all devices

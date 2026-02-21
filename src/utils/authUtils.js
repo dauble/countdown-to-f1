@@ -103,6 +103,26 @@ export function storePlaylistTitle(title) {
 }
 
 /**
+ * Get the last data hash that was successfully processed.
+ * Used to detect whether the OpenF1 data has changed since the last TTS update.
+ */
+export function getStoredDataHash() {
+  return config.get("f1DataHash");
+}
+
+/**
+ * Store the data hash after a successful playlist update.
+ * @param {string|null} hash - SHA-256 hex string, or null to clear
+ */
+export function storeDataHash(hash) {
+  if (hash === null) {
+    config.delete("f1DataHash");
+  } else {
+    config.set("f1DataHash", hash);
+  }
+}
+
+/**
  * Refresh the access token using the stored refresh token
  * @returns {Promise<string|null>} New access token, or null if refresh failed
  */

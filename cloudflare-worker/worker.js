@@ -19,6 +19,41 @@ const CACHE_KEY = 'f1_playlist_data';
 const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
 /**
+ * Compute a stable SHA-256 hash of the meaningful race and session fields.
+ * Weather data is intentionally excluded — it is live telemetry that can
+ * change frequently and does not warrant regenerating TTS audio.
+ * @param {Object} race - Formatted race object
+ * @param {Array}  sessions - Array of formatted session objects
+ * @returns {Promise<string>} Hex-encoded SHA-256 hash
+ */
+async function computeDataHash(race, sessions) {
+  const snapshot = JSON.stringify({
+    meetingKey: race.meetingKey,
+    name: race.name,
+    officialName: race.officialName,
+    location: race.location,
+    country: race.country,
+    circuit: race.circuit,
+    circuitType: race.circuitType,
+    dateStart: race.dateStart,
+    dateEnd: race.dateEnd,
+    year: race.year,
+    sessions: sessions.map(s => ({
+      sessionKey: s.sessionKey,
+      sessionName: s.sessionName,
+      sessionType: s.sessionType,
+      dateStart: s.dateStart,
+      dateEnd: s.dateEnd,
+    })),
+  });
+  const encoded = new TextEncoder().encode(snapshot);
+  const hashBuffer = await crypto.subtle.digest('SHA-256', encoded);
+  return Array.from(new Uint8Array(hashBuffer))
+    .map(b => b.toString(16).padStart(2, '0'))
+    .join('');
+}
+
+/**
  * Main worker event handler
  */
 export default {
@@ -30,14 +65,29 @@ export default {
     
     try {
       // Fetch fresh F1 data from OpenF1 API
-      const playlistData = await fetchF1Data();
-      
-      // Store in KV storage
+      const freshData = await fetchF1Data();
+
+      // Compute a stable hash of the meaningful race/session fields
+      const newHash = await computeDataHash(freshData.race, freshData.sessions);
+
+      // Compare with the previously stored hash — skip the KV write (and avoid
+      // triggering an unnecessary TTS refresh downstream) if nothing has changed
+      const cachedRaw = await env.F1_DATA.get(CACHE_KEY);
+      if (cachedRaw) {
+        const cached = JSON.parse(cachedRaw);
+        if (cached.dataHash === newHash) {
+          console.log('No changes detected in F1 data — skipping KV update, dataHash:', newHash);
+          return;
+        }
+      }
+
+      // Data has changed (or there was no previous cache) — persist the new payload
+      const playlistData = { ...freshData, dataHash: newHash };
       await env.F1_DATA.put(CACHE_KEY, JSON.stringify(playlistData), {
         expirationTtl: 86400 // 24 hours
       });
       
-      console.log('Successfully updated F1 playlist data');
+      console.log('F1 data changed — KV storage updated, dataHash:', newHash);
     } catch (error) {
       console.error('Error updating F1 data:', error);
       // Don't throw - let the worker continue serving cached data
@@ -82,7 +132,9 @@ export default {
         
         // If no cached data, fetch fresh data
         console.log('No cached data found, fetching fresh data');
-        const playlistData = await fetchF1Data();
+        const freshData = await fetchF1Data();
+        const dataHash = await computeDataHash(freshData.race, freshData.sessions);
+        const playlistData = { ...freshData, dataHash };
         
         // Store for future requests
         await env.F1_DATA.put(CACHE_KEY, JSON.stringify(playlistData), {
@@ -114,7 +166,9 @@ export default {
     // Route: POST /refresh - Manual refresh trigger (optional)
     if (url.pathname === '/refresh' && request.method === 'POST') {
       try {
-        const playlistData = await fetchF1Data();
+        const freshData = await fetchF1Data();
+        const dataHash = await computeDataHash(freshData.race, freshData.sessions);
+        const playlistData = { ...freshData, dataHash };
         
         await env.F1_DATA.put(CACHE_KEY, JSON.stringify(playlistData), {
           expirationTtl: 86400
@@ -123,6 +177,7 @@ export default {
         return new Response(JSON.stringify({ 
           success: true,
           message: 'Data refreshed successfully',
+          dataHash,
           timestamp: new Date().toISOString()
         }), {
           headers: {
