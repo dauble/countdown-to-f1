@@ -1,16 +1,15 @@
 // API Route to refresh MYO playlist from Cloudflare Worker data
-// This endpoint fetches fresh F1 data from the Cloudflare worker and updates
-// the existing MYO card with new TTS content using ElevenLabs + Yoto audio upload.
+// This endpoint fetches fresh F1 data from the Cloudflare worker and creates
+// a new MYO playlist via the Yoto Labs TTS API when data has changed.
 
-import { createOrUpdateTTSPlaylist, buildF1Chapters, deployToAllDevices } from "@/services/yotoService";
+import { createTextToSpeechPlaylist, buildF1Chapters, deployToAllDevices } from "@/services/yotoService";
 import { uploadCardIcon, uploadCountryFlagIcon, uploadCardCoverImage } from "@/utils/imageUtils";
 import { getAccessToken, getStoredCardId, storeCardId, getStoredPlaylistTitle, storePlaylistTitle, isAuthError, createAuthErrorResponse, getStoredDataHash, storeDataHash } from "@/utils/authUtils";
 
 /**
  * Refresh MYO playlist with latest data from Cloudflare Worker.
- * Uses ElevenLabs TTS + Yoto audio upload so that, when a card ID is already
- * stored, the existing playlist is updated in-place rather than a new one being
- * created on every refresh.
+ * Uses the Yoto Labs TTS API to create a new playlist when F1 data has changed.
+ * The data hash check above skips regeneration when the race/session data is unchanged.
  */
 export async function POST(request) {
   try {
@@ -155,14 +154,15 @@ export async function POST(request) {
     const title = storedTitle || `F1: ${raceData.name}`;
     console.log(`Using playlist title: "${title}" (stored: ${!!storedTitle})`);
     
-    // Step 12: Create or update TTS playlist using ElevenLabs + Yoto audio upload.
-    // When existingCardId is present the current card is updated in-place instead of
-    // creating a new playlist (which was the limitation of the Yoto Labs TTS API).
-    const yotoResult = await createOrUpdateTTSPlaylist({
+    // Step 12: Create TTS playlist using Yoto Labs TTS API.
+    // Yoto Labs handles TTS generation on their own infrastructure, so no external
+    // API quota is consumed. A new playlist is created when data changes; the
+    // skip-when-unchanged check above prevents unnecessary regeneration.
+    const yotoResult = await createTextToSpeechPlaylist({
       title,
       chapters,
       accessToken,
-      cardId: existingCardId, // Provides update-in-place when card already exists
+      cardId: existingCardId, // Accepted but not used by Labs API (always creates new)
       coverImageUrl,
     });
 

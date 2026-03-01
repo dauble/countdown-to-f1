@@ -2,7 +2,7 @@
 // This endpoint can be called by external services (e.g., cron jobs, CI/CD) to trigger playlist updates
 // Uses a secret token for authentication
 
-import { createOrUpdateTTSPlaylist, buildF1Chapters, deployToAllDevices } from "@/services/yotoService";
+import { createTextToSpeechPlaylist, buildF1Chapters, deployToAllDevices } from "@/services/yotoService";
 import { uploadCardIcon, uploadCountryFlagIcon, uploadCardCoverImage } from "@/utils/imageUtils";
 import { getAccessToken, refreshAccessToken, getStoredTokens, getStoredCardId, storeCardId, getStoredPlaylistTitle, storePlaylistTitle, getStoredDataHash, storeDataHash } from "@/utils/authUtils";
 
@@ -187,10 +187,11 @@ export async function POST(request) {
     const title = storedTitle || `F1: ${raceData.name}`;
     console.log(`[Webhook] Using playlist title: "${title}" (stored: ${!!storedTitle})`);
     
-    // Step 10: Create or update TTS playlist using ElevenLabs + Yoto audio upload.
-    // When existingCardId is present the current card is updated in-place instead of
-    // creating a new playlist (which was the limitation of the Yoto Labs TTS API).
-    const yotoResult = await createOrUpdateTTSPlaylist({
+    // Step 10: Create TTS playlist using Yoto Labs TTS API.
+    // Yoto Labs handles TTS generation on their own infrastructure, so no external
+    // API quota is consumed. A new playlist is created when data changes; the
+    // skip-when-unchanged check above prevents unnecessary regeneration.
+    const yotoResult = await createTextToSpeechPlaylist({
       title,
       chapters,
       accessToken,
@@ -224,9 +225,7 @@ export async function POST(request) {
     // Step 12: Return success
     return Response.json({
       success: true,
-      message: yotoResult.isUpdate
-        ? "Automated playlist refresh completed successfully (existing playlist updated)"
-        : "Automated playlist refresh completed successfully (new playlist created)",
+      message: "Automated playlist refresh completed successfully (new playlist created)",
       timestamp: new Date().toISOString(),
       race: {
         name: raceData.name,
