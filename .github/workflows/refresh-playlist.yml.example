@@ -46,8 +46,6 @@ jobs:
             echo "• HTTP 502 with 'Worker returned 500': the Cloudflare Worker failed."
             echo "  → Open the Cloudflare dashboard → Workers → your worker → Logs"
             echo "    to see the upstream error from the OpenF1 API or KV binding."
-            echo "• HTTP 400 with 'missingVariables': a required env var is not set."
-            echo "  → Run: fly secrets set CLOUDFLARE_WORKER_URL=https://... WEBHOOK_SECRET=..."
             echo "• HTTP 500 from the app itself: check app logs (fly logs)."
             echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
             exit 1
@@ -57,8 +55,11 @@ jobs:
             echo ""
             echo "━━━ Troubleshooting (4xx) ━━━"
             echo "• HTTP 401: WEBHOOK_SECRET secret is missing or incorrect."
-            echo "• HTTP 400: CLOUDFLARE_WORKER_URL is not set in the app environment."
-            echo "  → Check GitHub Actions secrets (Settings → Secrets → Actions)."
+            echo "  → Check that WEBHOOK_SECRET matches the value set via: fly secrets set WEBHOOK_SECRET=..."
+            echo "  → Ensure WEBHOOK_SECRET is also added as a GitHub Actions secret."
+            echo "• HTTP 400 with 'missingVariables': a required runtime env var is not set in the app."
+            echo "  → Run: fly secrets set CLOUDFLARE_WORKER_URL=https://..."
+            echo "  → Note: CLOUDFLARE_WORKER_URL is a runtime secret for the app, not a GitHub Actions secret."
             echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
             exit 1
           else
