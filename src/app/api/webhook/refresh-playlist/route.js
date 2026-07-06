@@ -65,17 +65,25 @@ export async function POST(request) {
       console.log('[Webhook] No refresh token available, using existing access token');
     }
 
-    // Step 3: Get Cloudflare Worker URL
+    // Step 3: Validate Cloudflare Worker configuration
     const workerUrl = process.env.CLOUDFLARE_WORKER_URL;
-    if (!workerUrl) {
+    const missingVars = [];
+    if (!workerUrl) missingVars.push('CLOUDFLARE_WORKER_URL');
+
+    if (missingVars.length > 0) {
+      console.error('[Webhook] Missing required environment variables:', missingVars.join(', '));
       return Response.json(
-        { error: "Cloudflare Worker URL not configured." },
+        {
+          error: "Cloudflare Worker not configured. Missing required environment variables.",
+          missingVariables: missingVars,
+          hint: "Set the missing variables as runtime environment variables (e.g., fly secrets set) and as GitHub Actions secrets.",
+        },
         { status: 400 }
       );
     }
 
     console.log('[Webhook] Automated refresh triggered from:', request.headers.get('user-agent') || 'unknown');
-    console.log('[Webhook] Fetching data from:', workerUrl);
+    console.log('[Webhook] Fetching data from Cloudflare Worker');
 
     // Step 4: Fetch fresh data from Cloudflare Worker
     let workerData;
@@ -84,16 +92,65 @@ export async function POST(request) {
         signal: AbortSignal.timeout(10000)
       });
 
+      // Always read the body as text first so we can include it in error details
+      // without risking a JSON parse failure on non-200 responses.
+      const workerBodyText = await workerResponse.text().catch(() => '');
+
       if (!workerResponse.ok) {
-        throw new Error(`Worker returned ${workerResponse.status}`);
+        const truncatedBody = workerBodyText.slice(0, 500);
+        console.error(
+          `[Webhook] Worker returned HTTP ${workerResponse.status}:`,
+          truncatedBody || '(empty response body)'
+        );
+        return Response.json(
+          {
+            error: "Failed to fetch data from Cloudflare Worker",
+            details: `Worker returned ${workerResponse.status}`,
+            workerStatus: workerResponse.status,
+            workerResponse: truncatedBody || null,
+            hint: workerResponse.status >= 500
+              ? "The Cloudflare Worker encountered an internal error. Check Worker logs in the Cloudflare dashboard and verify the KV namespace (F1_DATA) and Worker environment are configured correctly."
+              : null,
+          },
+          { status: 502 }
+        );
       }
 
-      workerData = await workerResponse.json();
+      if (!workerBodyText) {
+        console.error('[Webhook] Worker returned an empty response body');
+        return Response.json(
+          {
+            error: "Failed to fetch data from Cloudflare Worker",
+            details: "Worker returned an empty response body",
+            workerStatus: workerResponse.status,
+          },
+          { status: 502 }
+        );
+      }
+
+      try {
+        workerData = JSON.parse(workerBodyText);
+      } catch (parseError) {
+        console.error('[Webhook] Worker returned a non-JSON response:', workerBodyText.slice(0, 200));
+        return Response.json(
+          {
+            error: "Failed to fetch data from Cloudflare Worker",
+            details: "Worker returned a non-JSON response",
+            workerStatus: workerResponse.status,
+          },
+          { status: 502 }
+        );
+      }
+
       console.log('[Webhook] Data fetched, last updated:', workerData.lastUpdated);
     } catch (error) {
-      console.error('[Webhook] Failed to fetch from worker:', error);
+      console.error('[Webhook] Failed to fetch from worker:', error.message);
       return Response.json(
-        { error: "Failed to fetch data from Cloudflare Worker", details: error.message },
+        {
+          error: "Failed to fetch data from Cloudflare Worker",
+          details: error.message,
+          hint: "Verify the CLOUDFLARE_WORKER_URL is correct and the Worker is deployed and reachable.",
+        },
         { status: 502 }
       );
     }

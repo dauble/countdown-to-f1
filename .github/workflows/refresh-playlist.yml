@@ -41,6 +41,30 @@ jobs:
             echo "✅ Playlist refresh successful!"
             echo "$body" | jq -r '.race | "Race: \(.name) in \(.location), \(.country)"' || true
             echo "$body" | jq -r '.yoto | "Job ID: \(.jobId), Status: \(.status)"' || true
+          elif [ "$http_code" -ge 500 ]; then
+            echo "❌ Playlist refresh failed with server error (HTTP $http_code)"
+            echo "$body"
+            echo ""
+            echo "━━━ Troubleshooting (5xx) ━━━"
+            echo "• HTTP 502 with 'Worker returned 500': the Cloudflare Worker failed."
+            echo "  → Open the Cloudflare dashboard → Workers → your worker → Logs"
+            echo "    to see the upstream error from the OpenF1 API or KV binding."
+            echo "• HTTP 400 with 'missingVariables': a required env var is not set."
+            echo "  → Run: fly secrets set CLOUDFLARE_WORKER_URL=https://... WEBHOOK_SECRET=..."
+            echo "  → Also add CLOUDFLARE_WORKER_URL + WEBHOOK_SECRET as GitHub Actions secrets."
+            echo "• HTTP 500 from the app itself: check app logs (fly logs)."
+            echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+            exit 1
+          elif [ "$http_code" -ge 400 ]; then
+            echo "❌ Playlist refresh failed with client error (HTTP $http_code)"
+            echo "$body"
+            echo ""
+            echo "━━━ Troubleshooting (4xx) ━━━"
+            echo "• HTTP 401: WEBHOOK_SECRET secret is missing or incorrect."
+            echo "• HTTP 400: CLOUDFLARE_WORKER_URL is not set in the app environment."
+            echo "  → Check GitHub Actions secrets (Settings → Secrets → Actions)."
+            echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+            exit 1
           else
             echo "❌ Playlist refresh failed with status $http_code"
             echo "$body"
@@ -52,8 +76,11 @@ jobs:
 # 1. Go to your GitHub repository → Settings → Secrets and variables → Actions
 #
 # 2. Add these secrets:
-#    - APP_URL: Your deployed app URL (e.g., https://your-app.fly.dev)
-#    - WEBHOOK_SECRET: Your webhook secret from the .env file
+#    - APP_URL:               Your deployed app URL (e.g., https://your-app.fly.dev)
+#    - WEBHOOK_SECRET:        Your webhook secret (must match WEBHOOK_SECRET in fly secrets)
+#
+#    The app also requires CLOUDFLARE_WORKER_URL to be set as a runtime secret:
+#      fly secrets set CLOUDFLARE_WORKER_URL=https://f1-yoto-myo-worker.X.workers.dev
 #
 # 3. Enable the workflow:
 #    - Go to Actions tab
@@ -63,7 +90,7 @@ jobs:
 # 4. Test manually:
 #    - Go to Actions tab
 #    - Select "Refresh F1 Yoto Playlist"
-#    - Click "Run workflow"`
+#    - Click "Run workflow"
 #
 # 5. Monitor scheduled runs:
 #    - Check the Actions tab after scheduled time
