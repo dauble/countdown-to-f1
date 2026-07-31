@@ -1,7 +1,7 @@
 // API Route to generate a Formula 1 card
 import { getNextRace, getUpcomingSessions, getDriverStandings, getTeamStandings, generateF1Script, getMeetingDetails, getSessionWeather } from "@/services/f1Service";
 import { createTextToSpeechPlaylist, buildF1Chapters, deployToAllDevices } from "@/services/yotoService";
-import { uploadCardIcon, uploadCountryFlagIcon } from "@/utils/imageUtils";
+import { uploadCardIcon, uploadCountryFlagIcon, uploadTeamCarIcons } from "@/utils/imageUtils";
 import { getAccessToken, getStoredCardId, storeCardId, isAuthError, createAuthErrorResponse } from "@/utils/authUtils";
 
 // Increase max listeners to handle multiple AbortSignal.timeout() calls
@@ -215,8 +215,18 @@ export async function POST(request) {
       countryFlagIconId = await uploadCountryFlagIcon(raceData.countryFlag, accessToken, raceData.country);
     }
 
+    // Step 7b: Upload team-specific car icons for the driver/constructor standings chapters
+    const teamIconMap = await uploadTeamCarIcons(
+      [...driverStandings.map(d => d.team), ...teamStandings.map(t => t.team)],
+      accessToken
+    );
+
     // Step 8: Build chapters for Yoto playlist with custom icon, sessions, and enhanced details
-    const chapters = buildF1Chapters(raceData, sessions, iconMediaId, weather, countryFlagIconId);
+    const chapters = buildF1Chapters(raceData, sessions, iconMediaId, weather, countryFlagIconId, {
+      driverStandings,
+      teamStandings,
+      teamIconMap,
+    });
 
     // Step 9: Return success with generated data (not sent to Yoto yet)
     return Response.json({

@@ -18,6 +18,8 @@ This directory stores card cover images that will be uploaded to Yoto and displa
 ## Current Images
 
 - `countdown-to-f1-card.png` - Default F1 card cover (replace with your own image using this filename)
+- `countdown-to-f1-icon.png` - Generic 16x16 icon used for race weekend and session chapters
+- `ferrari.png`, `mclaren.png`, `mercedes.png`, `redbull.png` - Team car icons used on the Top 5 Drivers and Top 5 Constructors chapter tracks (see `src/utils/imageUtils.js#getTeamCarIconFilename`). Teams without a matching file fall back to the generic icon.
 
 ## API Reference
 

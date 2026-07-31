@@ -2,8 +2,9 @@
 // This endpoint fetches fresh F1 data from the Cloudflare worker and creates
 // a new MYO playlist via the Yoto Labs TTS API when data has changed.
 
+import { getDriverStandings, getTeamStandings } from "@/services/f1Service";
 import { createTextToSpeechPlaylist, buildF1Chapters, deployToAllDevices } from "@/services/yotoService";
-import { uploadCardIcon, uploadCountryFlagIcon, uploadCardCoverImage } from "@/utils/imageUtils";
+import { uploadCardIcon, uploadCountryFlagIcon, uploadCardCoverImage, uploadTeamCarIcons } from "@/utils/imageUtils";
 import { getAccessToken, getStoredCardId, storeCardId, getStoredPlaylistTitle, storePlaylistTitle, isAuthError, createAuthErrorResponse, getStoredDataHash, storeDataHash } from "@/utils/authUtils";
 
 /**
@@ -143,8 +144,23 @@ export async function POST(request) {
     // Step 8: Upload cover image if available
     const coverImageUrl = await uploadCardCoverImage(accessToken);
 
+    // Step 8b: Fetch current driver & constructor standings for additional chapters
+    const driverStandings = await getDriverStandings();
+    await new Promise(resolve => setTimeout(resolve, 500));
+    const teamStandings = await getTeamStandings();
+
+    // Step 8c: Upload team-specific car icons for the standings chapters
+    const teamIconMap = await uploadTeamCarIcons(
+      [...driverStandings.map(d => d.team), ...teamStandings.map(t => t.team)],
+      accessToken
+    );
+
     // Step 9: Build chapters with fresh data
-    const chapters = buildF1Chapters(raceData, formattedSessions, iconMediaId, weather, countryFlagIconId);
+    const chapters = buildF1Chapters(raceData, formattedSessions, iconMediaId, weather, countryFlagIconId, {
+      driverStandings,
+      teamStandings,
+      teamIconMap,
+    });
 
     // Step 10: Get stored card ID and playlist title (if exists)
     const existingCardId = getStoredCardId();
