@@ -168,7 +168,38 @@ Contributions are welcome! Please read [CONTRIBUTING.md](documentation/CONTRIBUT
 
 ## 🐛 Troubleshooting
 
-### "Not authenticated" error
+### Webhook returns 502 / "Worker returned 500"
+
+This means the app successfully received the webhook call but the Cloudflare Worker returned an error.
+
+**Diagnosis checklist:**
+
+1. **Check Worker logs** — Open the [Cloudflare dashboard](https://dash.cloudflare.com/) → Workers & Pages → your worker → Logs. The Worker logs will show exactly why it failed (e.g., KV binding misconfigured, OpenF1 API timeout).
+
+2. **Verify `CLOUDFLARE_WORKER_URL` is set** — The app returns HTTP 400 with `missingVariables` if this env var is absent. Set it in your deployment:
+   ```bash
+   fly secrets set CLOUDFLARE_WORKER_URL=https://f1-yoto-myo-worker.your-subdomain.workers.dev
+   ```
+
+3. **Verify the Worker's KV namespace** — The Worker uses a KV namespace called `F1_DATA`. Confirm that `wrangler.toml` has the correct `kv_namespaces` binding and that the namespace exists in your Cloudflare account.
+
+4. **Re-deploy the Worker** — Run `wrangler deploy` from the `cloudflare-worker/` directory to pick up any config changes.
+
+5. **Test the Worker directly**:
+   ```bash
+   curl https://f1-yoto-myo-worker.your-subdomain.workers.dev/health
+   curl https://f1-yoto-myo-worker.your-subdomain.workers.dev/playlist
+   ```
+
+### Webhook returns 400 / "missingVariables"
+
+The app could not find one or more required environment variables. The response body lists them:
+```json
+{"error":"...","missingVariables":["CLOUDFLARE_WORKER_URL"]}
+```
+Set every listed variable as a runtime secret (e.g. `fly secrets set VAR=value`) **and** as a GitHub Actions secret if the workflow references it.
+
+
 
 - You must click "🔐 Connect with Yoto" before using any features
 - If you see the login button, your session has expired - click it to re-authenticate
