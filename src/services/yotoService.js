@@ -536,9 +536,14 @@ export async function deployToAllDevices(cardId, accessToken) {
  * @param {string|null} iconMediaId - Optional custom icon media ID (from uploadCardIcon)
  * @param {Object|null} weather - Optional weather data (temperature, humidity, wind, rainfall)
  * @param {string|null} countryFlagIconId - Optional country flag icon media ID for first chapter
+ * @param {Object} [standings] - Optional championship standings for additional chapters
+ * @param {Array} [standings.driverStandings] - Top driver standings from getDriverStandings()
+ * @param {Array} [standings.teamStandings] - Top constructor standings from getTeamStandings()
+ * @param {Map<string,string>} [standings.teamIconMap] - Map of team name -> car icon media ID (from uploadTeamCarIcons)
  * @returns {Array} Array of chapter objects
  */
-export function buildF1Chapters(raceData, sessions = [], iconMediaId = null, weather = null, countryFlagIconId = null) {
+export function buildF1Chapters(raceData, sessions = [], iconMediaId = null, weather = null, countryFlagIconId = null, standings = {}) {
+  const { driverStandings = [], teamStandings = [], teamIconMap = new Map() } = standings;
   const chapters = [];
   
   console.log(`Building F1 chapters with ${sessions.length} sessions, iconMediaId: ${iconMediaId || 'none'}, weather: ${weather ? 'yes' : 'no'}, countryFlagIconId: ${countryFlagIconId || 'none'}`);
@@ -655,6 +660,40 @@ Get ready for an exciting race at ${raceData.circuit}!`,
         }
       ]
     };
+  }
+
+  // Chapter: Top 5 Drivers - one track per driver, each with its constructor's car icon
+  if (driverStandings.length > 0) {
+    const leaderIcon = teamIconMap.get(driverStandings[0].team) || iconMediaId;
+    chapters.push({
+      title: "Top 5 Drivers",
+      icon: leaderIcon ? `yoto:#${leaderIcon}` : null,
+      tracks: driverStandings.map(entry => {
+        const trackIcon = teamIconMap.get(entry.team) || iconMediaId;
+        return {
+          title: `P${entry.position}: ${entry.driver}`,
+          text: `In position ${entry.position}, ${entry.driver} driving for ${entry.team}, with ${entry.points} points.`,
+          icon: trackIcon ? `yoto:#${trackIcon}` : null,
+        };
+      }),
+    });
+  }
+
+  // Chapter: Top 5 Constructors - one track per team, each with its car icon
+  if (teamStandings.length > 0) {
+    const leaderIcon = teamIconMap.get(teamStandings[0].team) || iconMediaId;
+    chapters.push({
+      title: "Top 5 Constructors",
+      icon: leaderIcon ? `yoto:#${leaderIcon}` : null,
+      tracks: teamStandings.map(entry => {
+        const trackIcon = teamIconMap.get(entry.team) || iconMediaId;
+        return {
+          title: `P${entry.position}: ${entry.team}`,
+          text: `In position ${entry.position}, ${entry.team}, with ${entry.points} points.`,
+          icon: trackIcon ? `yoto:#${trackIcon}` : null,
+        };
+      }),
+    });
   }
 
   console.log(`Built ${chapters.length} total chapters for F1 card`);

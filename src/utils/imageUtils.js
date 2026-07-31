@@ -70,6 +70,108 @@ export async function uploadCardIcon(accessToken) {
 }
 
 /**
+ * Map an F1 constructor name to its car icon filename in
+ * public/assets/card-images, if a team-specific icon exists.
+ * @param {string} teamName - F1 constructor name (e.g. "Red Bull Racing")
+ * @returns {string|null} Icon filename, or null if no team-specific icon exists
+ */
+export function getTeamCarIconFilename(teamName) {
+  if (!teamName) return null;
+  const normalized = teamName.toLowerCase();
+
+  if (normalized.includes('ferrari')) return 'ferrari.png';
+  if (normalized.includes('mclaren')) return 'mclaren.png';
+  if (normalized.includes('mercedes')) return 'mercedes.png';
+  if (normalized.includes('red bull')) return 'redbull.png';
+
+  return null;
+}
+
+/**
+ * Upload a team's car icon (16x16) if a matching icon file exists.
+ * @param {string} teamName - F1 constructor name (e.g. "Red Bull Racing")
+ * @param {string} accessToken - Yoto API access token
+ * @returns {Promise<string|null>} Media ID of uploaded icon, or null if unavailable
+ */
+export async function uploadTeamCarIcon(teamName, accessToken) {
+  const iconName = getTeamCarIconFilename(teamName);
+  if (!iconName) {
+    return null;
+  }
+
+  try {
+    const publicDir = join(process.cwd(), 'public', 'assets', 'card-images');
+    const iconPath = join(publicDir, iconName);
+    const iconBuffer = readFileSync(iconPath);
+
+    console.log(`Found team icon for "${teamName}": ${iconName}, uploading to Yoto...`);
+
+    const url = new URL('https://api.yotoplay.com/media/displayIcons/user/me/upload');
+    url.searchParams.set('autoConvert', 'true');
+    url.searchParams.set('filename', iconName.replace(/\.[^/.]+$/, ''));
+
+    const response = await fetch(url.toString(), {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${accessToken}`,
+        'Content-Type': 'image/png',
+      },
+      body: iconBuffer,
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      if (errorText.includes('not authorized') || errorText.includes('explicit deny')) {
+        console.log('Note: Custom icon uploads require special API permissions. Continuing without team icon.');
+        return null;
+      }
+      throw new Error(`Team icon upload failed: ${errorText}`);
+    }
+
+    const result = await response.json();
+    const mediaId = result.displayIcon?.mediaId;
+
+    if (!mediaId) {
+      throw new Error('No mediaId in upload response');
+    }
+
+    console.log(`Team icon uploaded for "${teamName}" with mediaId: ${mediaId}`);
+    return mediaId;
+  } catch (error) {
+    console.log(`Could not upload team icon for "${teamName}": ${error.message}`);
+    return null;
+  }
+}
+
+/**
+ * Upload car icons for a set of teams, deduplicating by icon file so each
+ * icon file is only uploaded once even when multiple drivers share a team.
+ * @param {string[]} teamNames
+ * @param {string} accessToken - Yoto API access token
+ * @returns {Promise<Map<string, string>>} Map of team name -> media ID (only teams with a matching icon are included)
+ */
+export async function uploadTeamCarIcons(teamNames, accessToken) {
+  const mediaIdsByIconFile = new Map();
+  const mediaIdsByTeam = new Map();
+
+  for (const teamName of new Set((teamNames || []).filter(Boolean))) {
+    const iconName = getTeamCarIconFilename(teamName);
+    if (!iconName) continue;
+
+    if (!mediaIdsByIconFile.has(iconName)) {
+      mediaIdsByIconFile.set(iconName, await uploadTeamCarIcon(teamName, accessToken));
+    }
+
+    const mediaId = mediaIdsByIconFile.get(iconName);
+    if (mediaId) {
+      mediaIdsByTeam.set(teamName, mediaId);
+    }
+  }
+
+  return mediaIdsByTeam;
+}
+
+/**
  * Download and upload country flag as icon
  * @param {string} flagUrl - URL to the country flag image
  * @param {string} accessToken - Yoto API access token

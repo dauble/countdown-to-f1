@@ -8,10 +8,12 @@ The Yoto F1 Card Generator now creates separate chapters for each session of an 
 
 ### Data Sources
 
-The app uses two primary endpoints from the [OpenF1 API](https://openf1.org/):
+The app uses several endpoints from the [OpenF1 API](https://openf1.org/):
 
 1. **Meetings API** (`/v1/meetings`) - Gets information about the race weekend
 2. **Sessions API** (`/v1/sessions`) - Retrieves all sessions for a specific meeting
+3. **Drivers Championship API** (`/v1/championship_drivers`, beta) - Current top 5 drivers, as of the most recently completed Race session
+4. **Teams Championship API** (`/v1/championship_teams`, beta) - Current top 5 constructors, as of the most recently completed Race session
 
 ### Chapter Structure
 
@@ -32,6 +34,18 @@ A separate chapter for each upcoming session:
 - **Qualifying** - Explanation of the knockout format (Q1, Q2, Q3) and grid determination
 - **Sprint** - Information about sprint race format and points (if scheduled)
 - **Race** - Complete Grand Prix details with strategy notes
+
+#### Chapter: Top 5 Drivers
+
+- Current top 5 in the Drivers' Championship
+- One track per driver, in position order
+- Each track displays the driver's constructor car icon (see [Custom Icons](#custom-icons))
+
+#### Chapter: Top 5 Constructors
+
+- Current top 5 in the Constructors' Championship
+- One track per team, in position order
+- Each track displays that team's car icon (see [Custom Icons](#custom-icons))
 
 ### Session Information
 
@@ -189,13 +203,14 @@ sessions = rawSessions.map(session => ({
 
 ## Custom Icons
 
-Each chapter and track displays a custom F1 race car icon on your Yoto player:
+Each chapter and track displays a custom icon on your Yoto player:
 
-1. Icon file: `public/assets/card-images/countdown-to-f1-icon.png`
-2. Automatically uploaded to Yoto with `autoConvert=true`
-3. Resized to 16×16 pixels by Yoto API
-4. Stored as `yoto:#{mediaId}` format
-5. Applied to all chapters and tracks
+1. Race weekend and session chapters use the generic icon: `public/assets/card-images/countdown-to-f1-icon.png`
+2. Driver and constructor standings tracks use a team-specific car icon when one exists: `ferrari.png`, `mclaren.png`, `mercedes.png`, `redbull.png` (in `public/assets/card-images/`). Teams without a dedicated icon fall back to the generic icon.
+3. Icons are automatically uploaded to Yoto with `autoConvert=true`
+4. Resized to 16×16 pixels by Yoto API
+5. Stored as `yoto:#{mediaId}` format
+6. Team icons are uploaded once per unique file per request (`uploadTeamCarIcons` in `src/utils/imageUtils.js`), even if multiple drivers share a team
 
 ## Debugging
 
@@ -233,7 +248,6 @@ To verify the chapters are working:
 
 Potential improvements:
 
-- Add driver and team standings as additional chapters
 - Include weather forecasts for each session
 - Add qualifying results after Q3 completes
 - Real-time session updates during race weekend
