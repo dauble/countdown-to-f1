@@ -76,7 +76,7 @@ export async function POST(request) {
         {
           error: "Cloudflare Worker not configured. Missing required environment variables.",
           missingVariables: missingVars,
-          hint: "Set the missing variables as runtime environment variables (e.g., fly secrets set) and as GitHub Actions secrets.",
+          hint: "CLOUDFLARE_WORKER_URL is a runtime secret for the app only — set it with `fly secrets set CLOUDFLARE_WORKER_URL=<url>`. It is not read by the GitHub Actions workflow, so it does not need to be added as a repository secret.",
         },
         { status: 400 }
       );
@@ -144,11 +144,12 @@ export async function POST(request) {
 
       console.log('[Webhook] Data fetched, last updated:', workerData.lastUpdated);
     } catch (error) {
-      console.error('[Webhook] Failed to fetch from worker:', error.message);
+      const details = error instanceof Error ? error.message : String(error);
+      console.error('[Webhook] Failed to fetch from worker:', details);
       return Response.json(
         {
           error: "Failed to fetch data from Cloudflare Worker",
-          details: error.message,
+          details,
           hint: "Verify the CLOUDFLARE_WORKER_URL is correct and the Worker is deployed and reachable.",
         },
         { status: 502 }
@@ -303,11 +304,12 @@ export async function POST(request) {
     });
 
   } catch (error) {
+    const details = error instanceof Error ? error.message : String(error);
     console.error('[Webhook] Error:', error);
     return Response.json(
       {
         error: "Webhook execution failed",
-        details: error.message,
+        details,
         timestamp: new Date().toISOString(),
       },
       { status: 500 }
