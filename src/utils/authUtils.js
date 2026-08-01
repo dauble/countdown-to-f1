@@ -168,15 +168,52 @@ export async function refreshAccessToken() {
 }
 
 /**
+ * Get a usable access token, refreshing it first when possible.
+ *
+ * Yoto access tokens expire daily. Calling Yoto's API with a stale token
+ * doesn't return a clean 401 — it returns a generic authorizer denial
+ * ("User is not authorized to access this resource with an explicit deny
+ * in an identity-based policy"), which looks like a permissions/500 error.
+ * Routes should call this instead of getAccessToken() directly.
+ *
+ * @returns {Promise<{accessToken: string|null, reauthRequired: boolean}>}
+ */
+export async function getValidAccessToken() {
+  const accessToken = getAccessToken();
+  if (!accessToken) {
+    return { accessToken: null, reauthRequired: false };
+  }
+
+  const refreshedToken = await refreshAccessToken();
+  if (refreshedToken) {
+    return { accessToken: refreshedToken, reauthRequired: false };
+  }
+
+  const storedTokens = getStoredTokens();
+  if (storedTokens?.refreshToken) {
+    // Refresh token was available but refresh failed — token may be revoked
+    console.error('[Auth] Token refresh failed with an existing refresh token');
+    return { accessToken: null, reauthRequired: true };
+  }
+
+  // No refresh token available (e.g. legacy auth); fall back to existing access token
+  return { accessToken, reauthRequired: false };
+}
+
+/**
  * Handle authentication errors consistently
  * @param {Error} error - The error object
  * @returns {boolean} - True if it's an authentication error
  */
 export function isAuthError(error) {
+  const message = typeof error.message === 'string' ? error.message.toLowerCase() : '';
   return (
     error.status === 401 ||
-    (error.message && typeof error.message === 'string' && 
-     (error.message.includes('401') || error.message.toLowerCase().includes('unauthorized')))
+    error.status === 403 ||
+    message.includes('401') ||
+    message.includes('unauthorized') ||
+    message.includes('explicit deny') ||
+    message.includes('not authorized to access this resource')
   );
 }
 
