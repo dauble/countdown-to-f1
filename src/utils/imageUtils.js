@@ -83,6 +83,12 @@ export function getTeamCarIconFilename(teamName) {
   if (normalized.includes('mclaren')) return 'mclaren.png';
   if (normalized.includes('mercedes')) return 'mercedes.png';
   if (normalized.includes('red bull')) return 'redbull.png';
+  if (normalized.includes('racing bulls')) return 'racingbulls.png';
+  if (normalized.includes('aston martin')) return 'astonmartin.png';
+  if (normalized.includes('alpine')) return 'alpine.png';
+  if (normalized.includes('williams')) return 'williams.png';
+  if (normalized.includes('haas')) return 'haas.png';
+  if (normalized.includes('sauber')) return 'sauber.png';
 
   return null;
 }
