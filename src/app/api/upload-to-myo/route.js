@@ -1,13 +1,17 @@
 // API Route to upload audio to MYO card
 import { requestAudioUploadUrl, uploadAudioFile, waitForTranscoding, createAudioCard } from "@/services/yotoService";
 import { uploadCardCoverImage } from "@/utils/imageUtils";
-import { getAccessToken, isAuthError, createAuthErrorResponse, getStoredMyoCardId, storeMyoCardId } from "@/utils/authUtils";
+import { getValidAccessToken, isAuthError, createAuthErrorResponse, getStoredMyoCardId, storeMyoCardId } from "@/utils/authUtils";
 
 export async function POST(request) {
   try {
-    // Check authentication
-    const accessToken = getAccessToken();
+    // Check authentication, refreshing the token first since Yoto access
+    // tokens expire daily and a stale token causes an opaque 500.
+    const { accessToken, reauthRequired } = await getValidAccessToken();
     if (!accessToken) {
+      if (reauthRequired) {
+        return createAuthErrorResponse();
+      }
       return Response.json(
         { error: "Not authenticated. Please connect with Yoto first.", needsAuth: true },
         { status: 401 }

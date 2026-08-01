@@ -2,7 +2,7 @@
 import { getNextRace, getUpcomingSessions, getDriverStandings, getTeamStandings, generateF1Script, getMeetingDetails, getSessionWeather } from "@/services/f1Service";
 import { createTextToSpeechPlaylist, buildF1Chapters, deployToAllDevices } from "@/services/yotoService";
 import { uploadCardIcon, uploadCountryFlagIcon, uploadTeamCarIcons } from "@/utils/imageUtils";
-import { getAccessToken, getStoredCardId, storeCardId, isAuthError, createAuthErrorResponse } from "@/utils/authUtils";
+import { getValidAccessToken, getStoredCardId, storeCardId, isAuthError, createAuthErrorResponse } from "@/utils/authUtils";
 
 // Increase max listeners to handle multiple AbortSignal.timeout() calls
 // Each OpenF1 API call uses AbortSignal.timeout(5000) which adds event listeners
@@ -46,9 +46,13 @@ async function getUserTimezone(request) {
 
 export async function POST(request) {
   try {
-    // Step 1: Check if user is authenticated
-    const accessToken = getAccessToken();
+    // Step 1: Check if user is authenticated, refreshing the token first since
+    // Yoto access tokens expire daily and a stale token causes an opaque 500.
+    const { accessToken, reauthRequired } = await getValidAccessToken();
     if (!accessToken) {
+      if (reauthRequired) {
+        return createAuthErrorResponse();
+      }
       return Response.json(
         {
           error: "Not authenticated. Please connect with Yoto first.",

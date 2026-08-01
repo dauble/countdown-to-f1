@@ -5,7 +5,7 @@
 import { getDriverStandings, getTeamStandings } from "@/services/f1Service";
 import { createTextToSpeechPlaylist, buildF1Chapters, deployToAllDevices } from "@/services/yotoService";
 import { uploadCardIcon, uploadCountryFlagIcon, uploadCardCoverImage, uploadTeamCarIcons } from "@/utils/imageUtils";
-import { getAccessToken, getStoredCardId, storeCardId, getStoredPlaylistTitle, storePlaylistTitle, isAuthError, createAuthErrorResponse, getStoredDataHash, storeDataHash } from "@/utils/authUtils";
+import { getValidAccessToken, getStoredCardId, storeCardId, getStoredPlaylistTitle, storePlaylistTitle, isAuthError, createAuthErrorResponse, getStoredDataHash, storeDataHash } from "@/utils/authUtils";
 
 /**
  * Refresh MYO playlist with latest data from Cloudflare Worker.
@@ -14,9 +14,13 @@ import { getAccessToken, getStoredCardId, storeCardId, getStoredPlaylistTitle, s
  */
 export async function POST(request) {
   try {
-    // Step 1: Check authentication
-    const accessToken = getAccessToken();
+    // Step 1: Check authentication, refreshing the token first since Yoto
+    // access tokens expire daily and a stale token causes an opaque 500.
+    const { accessToken, reauthRequired } = await getValidAccessToken();
     if (!accessToken) {
+      if (reauthRequired) {
+        return createAuthErrorResponse();
+      }
       return Response.json(
         { error: "Not authenticated. Please connect with Yoto first.", needsAuth: true },
         { status: 401 }

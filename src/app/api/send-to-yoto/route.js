@@ -1,13 +1,17 @@
 // API Route to send generated card data to Yoto
 import { createOrUpdateTTSPlaylist, deployToAllDevices } from "@/services/yotoService";
 import { uploadCardCoverImage } from "@/utils/imageUtils";
-import { getAccessToken, getStoredCardId, storeCardId, storePlaylistTitle, isAuthError, createAuthErrorResponse } from "@/utils/authUtils";
+import { getValidAccessToken, getStoredCardId, storeCardId, storePlaylistTitle, isAuthError, createAuthErrorResponse } from "@/utils/authUtils";
 
 export async function POST(request) {
   try {
-    // Step 1: Check if user is authenticated
-    const accessToken = getAccessToken();
+    // Step 1: Check if user is authenticated, refreshing the token first since
+    // Yoto access tokens expire daily and a stale token causes an opaque 500.
+    const { accessToken, reauthRequired } = await getValidAccessToken();
     if (!accessToken) {
+      if (reauthRequired) {
+        return createAuthErrorResponse();
+      }
       return Response.json(
         {
           error: "Not authenticated. Please connect with Yoto first.",
