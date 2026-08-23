@@ -11,6 +11,21 @@ id = "d3e9ce1a8db6447a80cde6e0be1df9f6"
 [triggers]
 crons = ["0 6 * * *"]
 
+[observability]
+enabled = false
+head_sampling_rate = 1
+
+[observability.logs]
+enabled = true
+head_sampling_rate = 1
+persist = true
+invocation_logs = true
+
+[observability.traces]
+enabled = true
+persist = true
+head_sampling_rate = 1
+
 # Routes configuration (update with your custom domain)
 # routes = [
 #   { pattern = "your-domain.workers.dev/*", zone_name = "your-domain.workers.dev" }
