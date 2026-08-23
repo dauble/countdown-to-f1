@@ -5,7 +5,21 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [1.4.0] - 2026-08-23
+
+### Deprecated
+
+- **Project archived - no longer supported.** OpenF1, the free API this project
+  relies on for all race, session, and weather data, now requires a paid
+  subscription for the API access this app depends on.
+  - No further development, bug fixes, or releases are planned
+  - The GitHub repository will be archived (read-only)
+  - Issues and pull requests will no longer be reviewed
+  - The Cloudflare Worker and deployed app may keep running, but `/playlist`
+    and `/refresh` will fail once OpenF1 blocks unauthenticated access
+  - Forks are welcome; swapping in a free alternative such as
+    [Jolpica-F1](https://github.com/jolpica/jolpica-f1) for schedule data
+    would be the place to start
 
 ### Added
 

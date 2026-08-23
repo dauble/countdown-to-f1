@@ -1,5 +1,12 @@
 # 🏎️ Yoto Formula 1 Card Generator
 
+> ⚠️ **This project is no longer supported.** OpenF1, the free API this app
+> relies on for all race, session, and weather data, now requires a paid
+> subscription for the API access this project depends on. This repository
+> will be archived and will not receive further updates, and issues/PRs will
+> not be reviewed. See the [Changelog](documentation/CHANGELOG.md) for
+> details. Forks are welcome.
+
 A Next.js application that automatically creates and updates Yoto MYO (Make Your Own) cards with the latest Formula 1 race information. Perfect for F1 fans who want their Yoto players to announce upcoming races!
 
 ## ✨ Features
