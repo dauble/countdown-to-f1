@@ -14,6 +14,11 @@
 
 const F1_API_BASE = 'https://api.openf1.org/v1';
 const CACHE_KEY = 'f1_playlist_data';
+// OpenF1 blocks unauthenticated global access while a session is live, which can make
+// fetchF1Data() fail for hours at a time on race weekends. Keep cached data around well
+// past the daily refresh cadence so a live-session outage doesn't wipe out the last known
+// good playlist before the next successful refresh can replace it.
+const CACHE_TTL_SECONDS = 7 * 24 * 60 * 60; // 7 days
 
 // Delay utility to respect OpenF1 API rate limit (3 requests/second)
 const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
@@ -84,9 +89,9 @@ export default {
       // Data has changed (or there was no previous cache) — persist the new payload
       const playlistData = { ...freshData, dataHash: newHash };
       await env.F1_DATA.put(CACHE_KEY, JSON.stringify(playlistData), {
-        expirationTtl: 86400 // 24 hours
+        expirationTtl: CACHE_TTL_SECONDS
       });
-      
+
       console.log('F1 data changed — KV storage updated, dataHash:', newHash);
     } catch (error) {
       console.error('Error updating F1 data:', error);
@@ -138,7 +143,7 @@ export default {
         
         // Store for future requests
         await env.F1_DATA.put(CACHE_KEY, JSON.stringify(playlistData), {
-          expirationTtl: 86400 // 24 hours
+          expirationTtl: CACHE_TTL_SECONDS
         });
         
         return new Response(JSON.stringify(playlistData), {
@@ -169,12 +174,12 @@ export default {
         const freshData = await fetchF1Data();
         const dataHash = await computeDataHash(freshData.race, freshData.sessions);
         const playlistData = { ...freshData, dataHash };
-        
+
         await env.F1_DATA.put(CACHE_KEY, JSON.stringify(playlistData), {
-          expirationTtl: 86400
+          expirationTtl: CACHE_TTL_SECONDS
         });
-        
-        return new Response(JSON.stringify({ 
+
+        return new Response(JSON.stringify({
           success: true,
           message: 'Data refreshed successfully',
           dataHash,
@@ -187,9 +192,25 @@ export default {
         });
       } catch (error) {
         console.error('Error refreshing data:', error);
-        return new Response(JSON.stringify({ 
+
+        // OpenF1 blocks unauthenticated access while a session is live. Rather than
+        // hard-failing the caller, fall back to serving the last known good data (if any)
+        // so callers like the refresh webhook can keep working through the outage.
+        const cachedData = await env.F1_DATA.get(CACHE_KEY);
+        if (cachedData) {
+          console.log('Refresh failed, serving stale cached data instead');
+          return new Response(cachedData, {
+            headers: {
+              'Content-Type': 'application/json',
+              'X-Data-Stale': 'true',
+              ...corsHeaders
+            }
+          });
+        }
+
+        return new Response(JSON.stringify({
           error: 'Failed to refresh data',
-          message: error.message 
+          message: error.message
         }), {
           status: 500,
           headers: {
