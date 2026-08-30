@@ -9,7 +9,9 @@
  * - Scheduled daily refresh of F1 data from OpenF1 API
  * - Serves cached playlist data to Yoto MYO card requests
  * - Handles timezone conversion for race times
- * - Rate-limited API calls to respect OpenF1 limits (3 req/sec)
+ * - Rate-limited API calls to respect OpenF1's Community-tier limits
+ *   (up to 3 requests/second and 30 requests/minute, see
+ *   https://openf1.org/#features)
  */
 
 const F1_API_BASE = 'https://api.openf1.org/v1';
@@ -20,8 +22,78 @@ const CACHE_KEY = 'f1_playlist_data';
 // good playlist before the next successful refresh can replace it.
 const CACHE_TTL_SECONDS = 7 * 24 * 60 * 60; // 7 days
 
-// Delay utility to respect OpenF1 API rate limit (3 requests/second)
 const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+
+// Rate limiter for OpenF1 calls, shared by every request/scheduled event
+// handled within this isolate. Stays comfortably under the documented
+// Community-tier ceiling (~2.5 req/sec, 28 req/min) rather than skating
+// right at it, and retries once on HTTP 429 using Retry-After.
+const MIN_INTERVAL_MS = 400;
+const WINDOW_MS = 60_000;
+const WINDOW_LIMIT = 28;
+
+let queueTail = Promise.resolve();
+const requestTimestamps = [];
+
+function pruneWindow(now) {
+  while (requestTimestamps.length && now - requestTimestamps[0] >= WINDOW_MS) {
+    requestTimestamps.shift();
+  }
+}
+
+async function waitForSlot() {
+  const now = Date.now();
+  pruneWindow(now);
+
+  let waitMs = 0;
+  const lastRequestAt = requestTimestamps[requestTimestamps.length - 1];
+  if (lastRequestAt !== undefined) {
+    const sinceLast = now - lastRequestAt;
+    if (sinceLast < MIN_INTERVAL_MS) {
+      waitMs = MIN_INTERVAL_MS - sinceLast;
+    }
+  }
+
+  if (requestTimestamps.length >= WINDOW_LIMIT) {
+    const windowWait = WINDOW_MS - (now - requestTimestamps[0]) + 10;
+    waitMs = Math.max(waitMs, windowWait);
+  }
+
+  if (waitMs > 0) {
+    await delay(waitMs);
+  }
+
+  requestTimestamps.push(Date.now());
+}
+
+/**
+ * Fetch a path from the OpenF1 API, respecting the Community-tier rate
+ * limits across all callers in this isolate and retrying once on HTTP 429.
+ */
+function openf1Fetch(path, options = {}) {
+  const task = queueTail.then(async () => {
+    await waitForSlot();
+
+    const doFetch = () =>
+      fetch(`${F1_API_BASE}${path}`, { signal: AbortSignal.timeout(5000), ...options });
+
+    let response = await doFetch();
+
+    if (response.status === 429) {
+      const retryAfterHeader = response.headers.get('Retry-After');
+      const retryAfterMs = retryAfterHeader ? parseFloat(retryAfterHeader) * 1000 : 2000;
+      console.warn(`OpenF1 rate limit hit for ${path}, retrying after ${retryAfterMs}ms`);
+      await delay(Math.max(retryAfterMs, 1000));
+      await waitForSlot();
+      response = await doFetch();
+    }
+
+    return response;
+  });
+
+  queueTail = task.catch(() => {});
+  return task;
+}
 
 /**
  * Compute a stable SHA-256 hash of the meaningful race and session fields.
@@ -251,25 +323,19 @@ export default {
 async function fetchF1Data() {
   const currentYear = new Date().getFullYear();
   const now = new Date().toISOString();
-  
+
   // Get next race
   const raceData = await getNextRace(currentYear, now);
-  
-  // Respect rate limit
-  await delay(500);
-  
+
   // Get sessions for this race
   const sessions = await getUpcomingSessions(raceData.meetingKey);
-  
-  await delay(500);
-  
+
   // Get weather data for first session if available
   let weather = null;
   if (sessions.length > 0 && sessions[0].sessionKey) {
     weather = await getSessionWeather(sessions[0].sessionKey);
-    await delay(500);
   }
-  
+
   return {
     race: raceData,
     sessions: sessions,
@@ -283,9 +349,8 @@ async function fetchF1Data() {
  */
 async function getNextRace(currentYear, now) {
   try {
-    const response = await fetch(
-      `${F1_API_BASE}/meetings?year=${currentYear}&date_start>=${now.split('T')[0]}`,
-      { signal: AbortSignal.timeout(5000) }
+    const response = await openf1Fetch(
+      `/meetings?year=${currentYear}&date_start>=${now.split('T')[0]}`
     );
 
     if (!response.ok) {
@@ -293,15 +358,11 @@ async function getNextRace(currentYear, now) {
     }
 
     const meetings = await response.json();
-    
+
     if (!meetings || meetings.length === 0) {
       // Try next year
-      await delay(500);
       const nextYear = currentYear + 1;
-      const nextYearResponse = await fetch(
-        `${F1_API_BASE}/meetings?year=${nextYear}`,
-        { signal: AbortSignal.timeout(5000) }
-      );
+      const nextYearResponse = await openf1Fetch(`/meetings?year=${nextYear}`);
       
       if (!nextYearResponse.ok) {
         throw new Error('No upcoming races found');
@@ -329,9 +390,8 @@ async function getUpcomingSessions(meetingKey) {
   try {
     const now = new Date().toISOString();
     
-    const response = await fetch(
-      `${F1_API_BASE}/sessions?meeting_key=${meetingKey}&date_start>=${now.split('T')[0]}`,
-      { signal: AbortSignal.timeout(5000) }
+    const response = await openf1Fetch(
+      `/sessions?meeting_key=${meetingKey}&date_start>=${now.split('T')[0]}`
     );
 
     if (!response.ok) {
@@ -367,10 +427,7 @@ async function getUpcomingSessions(meetingKey) {
  */
 async function getSessionWeather(sessionKey) {
   try {
-    const response = await fetch(
-      `${F1_API_BASE}/weather?session_key=${sessionKey}`,
-      { signal: AbortSignal.timeout(5000) }
-    );
+    const response = await openf1Fetch(`/weather?session_key=${sessionKey}`);
 
     if (!response.ok) {
       console.error('Failed to fetch weather');

@@ -10,9 +10,6 @@ if (typeof process !== 'undefined' && process.setMaxListeners) {
   process.setMaxListeners(20);
 }
 
-// Delay utility to respect OpenF1 API rate limit (3 requests/second)
-const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
-
 /**
  * Get user's timezone from IP address
  */
@@ -99,44 +96,34 @@ export async function POST(request) {
       }
     }
     
-    // If worker fetch failed or not enabled, fetch from OpenF1 API
+    // If worker fetch failed or not enabled, fetch from OpenF1 API.
+    // openf1Fetch() (used inside f1Service) serializes and paces every call
+    // across the app, so these can simply be awaited in sequence.
     if (!raceData) {
       console.log('Fetching data from OpenF1 API');
-      
-      // Sequential API calls to respect 3 req/sec rate limit
-      // Using 500ms delays = 2 req/sec, well below the 3 req/sec limit for safety
+
       raceData = await getNextRace();
-      await delay(500);
-      
+
       // Step 4a: Fetch all upcoming sessions for this race weekend
       if (raceData.meetingKey) {
-        const rawSessions = await getUpcomingSessions(raceData.meetingKey);
-        await delay(500); // Rate limit protection after sessions call
-        
-        // Sessions will be converted to user timezone below
-        sessions = rawSessions;
-        
+        sessions = await getUpcomingSessions(raceData.meetingKey);
         console.log(`Found ${sessions.length} upcoming sessions for this race weekend`);
       }
-      
+
       // Fetch weather data for first session if available
       if (sessions.length > 0 && sessions[0].sessionKey) {
         try {
           console.log(`Fetching weather for sessionKey: ${sessions[0].sessionKey}`);
           weather = await getSessionWeather(sessions[0].sessionKey);
           console.log('Weather data fetched:', weather);
-          await delay(500);
         } catch (error) {
           console.error('Failed to fetch weather data:', error.message);
         }
       }
     }
-    
+
     const driverStandings = await getDriverStandings();
-    await delay(500);
-    
     const teamStandings = await getTeamStandings();
-    await delay(500);
 
     // Step 4: Convert race time to user's timezone
     if (raceData.dateStart) {
@@ -204,7 +191,6 @@ export async function POST(request) {
         console.log(`Fetching meeting details for meetingKey: ${raceData.meetingKey}`);
         meetingDetails = await getMeetingDetails(raceData.meetingKey);
         console.log('Meeting details fetched:', meetingDetails);
-        await delay(500); // Increased to 500ms for extra safety
       } catch (error) {
         console.error('Failed to fetch meeting details:', error.message);
       }
