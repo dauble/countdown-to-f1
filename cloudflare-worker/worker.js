@@ -74,14 +74,26 @@ function openf1Fetch(path, options = {}) {
   const task = queueTail.then(async () => {
     await waitForSlot();
 
+    const { signal: callerSignal, ...restOptions } = options;
     const doFetch = () =>
-      fetch(`${F1_API_BASE}${path}`, { signal: AbortSignal.timeout(5000), ...options });
+      fetch(`${F1_API_BASE}${path}`, { ...restOptions, signal: callerSignal ?? AbortSignal.timeout(5000) });
 
     let response = await doFetch();
 
     if (response.status === 429) {
       const retryAfterHeader = response.headers.get('Retry-After');
-      const retryAfterMs = retryAfterHeader ? parseFloat(retryAfterHeader) * 1000 : 2000;
+      let retryAfterMs = 2000;
+      if (retryAfterHeader) {
+        const seconds = parseFloat(retryAfterHeader);
+        if (!isNaN(seconds)) {
+          retryAfterMs = seconds * 1000;
+        } else {
+          const date = new Date(retryAfterHeader);
+          if (!isNaN(date.getTime())) {
+            retryAfterMs = Math.max(date.getTime() - Date.now(), 0);
+          }
+        }
+      }
       console.warn(`OpenF1 rate limit hit for ${path}, retrying after ${retryAfterMs}ms`);
       await delay(Math.max(retryAfterMs, 1000));
       await waitForSlot();
