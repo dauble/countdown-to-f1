@@ -2,13 +2,14 @@
 // API Documentation: https://openf1.org/
 //
 // RATE LIMITING:
-// OpenF1 API has a strict limit of 3 requests per second.
-// This service includes 500ms delays between internal API calls (2 req/sec).
-// Callers must also add 500ms delays between function calls to stay under the limit.
+// OpenF1's Community (free) tier allows up to 3 requests/second and
+// 30 requests/minute (https://openf1.org/#features). All requests go
+// through openf1Fetch(), which serializes and paces every call across the
+// whole app so this limit is honored automatically — callers don't need to
+// add their own delays between functions.
 
 import { getCircuitTypeDescription } from "@/utils/circuitUtils";
-
-const F1_API_BASE = "https://api.openf1.org/v1";
+import { openf1Fetch } from "@/utils/openf1Client";
 
 // Mock data for when API is unavailable
 const MOCK_DATA = {
@@ -46,9 +47,8 @@ export async function getNextRace() {
     const now = new Date().toISOString();
     
     // Get all meetings for the current year, ordered by date
-    const response = await fetch(
-      `${F1_API_BASE}/meetings?year=${currentYear}&date_start>=${now.split('T')[0]}`,
-      { signal: AbortSignal.timeout(5000) }
+    const response = await openf1Fetch(
+      `/meetings?year=${currentYear}&date_start>=${now.split('T')[0]}`
     );
 
     console.log("F1 API response:", response);
@@ -58,15 +58,11 @@ export async function getNextRace() {
     }
 
     const meetings = await response.json();
-    
+
     if (!meetings || meetings.length === 0) {
       // If no future races this year, try next year
-      await new Promise(resolve => setTimeout(resolve, 500)); // Rate limit protection
       const nextYear = currentYear + 1;
-      const nextYearResponse = await fetch(
-        `${F1_API_BASE}/meetings?year=${nextYear}`,
-        { signal: AbortSignal.timeout(5000) }
-      );
+      const nextYearResponse = await openf1Fetch(`/meetings?year=${nextYear}`);
       
       if (!nextYearResponse.ok) {
         throw new Error("No upcoming races found");
@@ -98,9 +94,8 @@ export async function getUpcomingSessions(meetingKey) {
     const now = new Date().toISOString();
     
     // Fetch all sessions for this meeting that haven't ended yet
-    const response = await fetch(
-      `${F1_API_BASE}/sessions?meeting_key=${meetingKey}&date_start>=${now.split('T')[0]}`,
-      { signal: AbortSignal.timeout(5000) }
+    const response = await openf1Fetch(
+      `/sessions?meeting_key=${meetingKey}&date_start>=${now.split('T')[0]}`
     );
 
     if (!response.ok) {
@@ -132,19 +127,28 @@ export async function getUpcomingSessions(meetingKey) {
   }
 }
 
+// getDriverStandings() and getTeamStandings() both need the latest completed
+// race session and are typically called back-to-back for the same card
+// generation. Memoizing briefly avoids doubling up on OpenF1 calls for data
+// that can't have changed in that time, which keeps us further under the
+// per-minute limit.
+const LATEST_SESSION_CACHE_TTL_MS = 60_000;
+let latestSessionCache = null;
+
 /**
  * Find the most recently completed Race session. Championship standings
  * (points_current/position_current) are calculated as of a specific session,
  * so we need a session that has actually happened to have any data.
  */
 async function getLatestCompletedRaceSession() {
+  if (latestSessionCache && Date.now() - latestSessionCache.fetchedAt < LATEST_SESSION_CACHE_TTL_MS) {
+    return latestSessionCache.session;
+  }
+
   const now = new Date();
 
   const fetchRaceSessions = async (year) => {
-    const response = await fetch(
-      `${F1_API_BASE}/sessions?session_name=Race&year=${year}`,
-      { signal: AbortSignal.timeout(5000) }
-    );
+    const response = await openf1Fetch(`/sessions?session_name=Race&year=${year}`);
 
     if (!response.ok) {
       throw new Error(`Failed to fetch race sessions for ${year}`);
@@ -162,7 +166,6 @@ async function getLatestCompletedRaceSession() {
   if (completed.length === 0) {
     // No races have happened yet this year (e.g. off-season) — fall back to
     // the previous year's final standings.
-    await new Promise(resolve => setTimeout(resolve, 500));
     completed = completedSessions(await fetchRaceSessions(now.getFullYear() - 1));
   }
 
@@ -170,7 +173,9 @@ async function getLatestCompletedRaceSession() {
     throw new Error("No completed race sessions found");
   }
 
-  return completed[completed.length - 1];
+  const session = completed[completed.length - 1];
+  latestSessionCache = { session, fetchedAt: Date.now() };
+  return session;
 }
 
 /**
@@ -182,12 +187,8 @@ export async function getDriverStandings() {
   try {
     const lastSession = await getLatestCompletedRaceSession();
 
-    // Rate limit protection before next API call
-    await new Promise(resolve => setTimeout(resolve, 500));
-
-    const championshipResponse = await fetch(
-      `${F1_API_BASE}/championship_drivers?session_key=${lastSession.session_key}`,
-      { signal: AbortSignal.timeout(5000) }
+    const championshipResponse = await openf1Fetch(
+      `/championship_drivers?session_key=${lastSession.session_key}`
     );
 
     if (!championshipResponse.ok) {
@@ -200,13 +201,9 @@ export async function getDriverStandings() {
       throw new Error("No driver championship data found");
     }
 
-    // Rate limit protection before next API call
-    await new Promise(resolve => setTimeout(resolve, 500));
-
     // Fetch driver details to get names and teams
-    const driversResponse = await fetch(
-      `${F1_API_BASE}/drivers?session_key=${lastSession.session_key}`,
-      { signal: AbortSignal.timeout(5000) }
+    const driversResponse = await openf1Fetch(
+      `/drivers?session_key=${lastSession.session_key}`
     );
 
     if (!driversResponse.ok) {
@@ -243,12 +240,8 @@ export async function getTeamStandings() {
   try {
     const lastSession = await getLatestCompletedRaceSession();
 
-    // Rate limit protection before next API call
-    await new Promise(resolve => setTimeout(resolve, 500));
-
-    const championshipResponse = await fetch(
-      `${F1_API_BASE}/championship_teams?session_key=${lastSession.session_key}`,
-      { signal: AbortSignal.timeout(5000) }
+    const championshipResponse = await openf1Fetch(
+      `/championship_teams?session_key=${lastSession.session_key}`
     );
 
     if (!championshipResponse.ok) {
@@ -365,10 +358,10 @@ Thank you for listening! Enjoy the racing!`;
  */
 export async function getMeetingDetails(meetingKey) {
   try {
-    const url = `${F1_API_BASE}/meetings?meeting_key=${meetingKey}`;
-    console.log('Fetching meeting details from:', url);
-    
-    const response = await fetch(url, { signal: AbortSignal.timeout(5000) });
+    const path = `/meetings?meeting_key=${meetingKey}`;
+    console.log('Fetching meeting details from:', path);
+
+    const response = await openf1Fetch(path);
 
     if (!response.ok) {
       const errorText = await response.text();
@@ -412,10 +405,10 @@ export async function getMeetingDetails(meetingKey) {
 export async function getSessionWeather(sessionKey) {
   try {
     // Get the most recent weather reading for this session
-    const url = `${F1_API_BASE}/weather?session_key=${sessionKey}`;
-    console.log('Fetching weather from:', url);
-    
-    const response = await fetch(url, { signal: AbortSignal.timeout(5000) });
+    const path = `/weather?session_key=${sessionKey}`;
+    console.log('Fetching weather from:', path);
+
+    const response = await openf1Fetch(path);
 
     if (!response.ok) {
       const errorText = await response.text();

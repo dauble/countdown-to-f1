@@ -235,9 +235,10 @@ export async function POST(request) {
     // Step 7: Upload cover image if available
     const coverImageUrl = await uploadCardCoverImage(accessToken);
 
-    // Step 7b: Fetch current driver & constructor standings for additional chapters
+    // Step 7b: Fetch current driver & constructor standings for additional chapters.
+    // openf1Fetch() (used inside f1Service) serializes and paces every OpenF1
+    // call across the app, so no manual delay is needed here.
     const driverStandings = await getDriverStandings();
-    await new Promise(resolve => setTimeout(resolve, 500));
     const teamStandings = await getTeamStandings();
 
     // Step 7c: Upload team-specific car icons for the standings chapters

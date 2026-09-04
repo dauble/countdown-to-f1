@@ -5,21 +5,29 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.4.1] - 2026-08-30
+
+### Fixed
+
+- **Project is supported again.** The 1.4.0 archival notice claimed OpenF1
+  now requires a paid subscription for all access. That was inaccurate:
+  OpenF1 offers a free **Community** tier (see the
+  [Access & Support section](https://openf1.org/#features)) with a documented
+  limit of up to 3 requests/second and 30 requests/minute — this project has
+  never needed more than that. The archival notice has been removed and
+  development continues.
+- **Centralized OpenF1 rate limiting** - Replaced the scattered fixed 500ms
+  delays in `f1Service.js` and the Cloudflare Worker with a shared
+  rate-limited request queue (`openf1Fetch`) that:
+  - Paces every OpenF1 call across the whole app to ~2.5 req/sec and 28
+    req/min, staying safely under the Community-tier ceiling even when
+    multiple requests run concurrently
+  - Retries once on HTTP 429, honoring the `Retry-After` header
+  - Removes duplicate lookups of the latest completed race session between
+    driver and team standings, cutting the number of calls needed per card
+    generation
+
 ## [1.4.0] - 2026-08-23
-
-### Deprecated
-
-- **Project archived - no longer supported.** OpenF1, the free API this project
-  relies on for all race, session, and weather data, now requires a paid
-  subscription for the API access this app depends on.
-  - No further development, bug fixes, or releases are planned
-  - The GitHub repository will be archived (read-only)
-  - Issues and pull requests will no longer be reviewed
-  - The Cloudflare Worker and deployed app may keep running, but `/playlist`
-    and `/refresh` will fail once OpenF1 blocks unauthenticated access
-  - Forks are welcome; swapping in a free alternative such as
-    [Jolpica-F1](https://github.com/jolpica/jolpica-f1) for schedule data
-    would be the place to start
 
 ### Added
 
