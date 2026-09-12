@@ -7,12 +7,15 @@ compatibility_date = "2024-01-01"
 binding = "F1_DATA"
 id = "d3e9ce1a8db6447a80cde6e0be1df9f6"
 
-# Schedule daily refresh at 6:00 AM UTC (adjust as needed)
+# Refresh every 15 minutes. Each run makes ~3 OpenF1 calls (meetings, sessions,
+# weather), well within the Community-tier limit of 3 req/s / 30 req/min even
+# run back-to-back, and the worker skips the KV write entirely when nothing
+# has changed, so this stays far under Cloudflare's free-tier KV write quota.
 [triggers]
-crons = ["0 6 * * *"]
+crons = ["*/15 * * * *"]
 
 [observability]
-enabled = false
+enabled = true
 head_sampling_rate = 1
 
 [observability.logs]
@@ -30,18 +33,3 @@ head_sampling_rate = 1
 # routes = [
 #   { pattern = "your-domain.workers.dev/*", zone_name = "your-domain.workers.dev" }
 # ]
-
-# Environment-specific configuration
-[env.production]
-name = "f1-yoto-myo-worker"
-# Production KV namespace
-[[env.production.kv_namespaces]]
-binding = "F1_DATA"
-id = "your_production_kv_namespace_id"
-
-[env.staging]
-name = "f1-yoto-myo-worker-staging"
-# Staging KV namespace
-[[env.staging.kv_namespaces]]
-binding = "F1_DATA"
-id = "your_staging_kv_namespace_id"
