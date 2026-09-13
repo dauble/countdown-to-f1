@@ -30,7 +30,7 @@ A Next.js application that automatically creates and updates Yoto MYO (Make Your
 
 - Node.js 18+ installed
 - A [Yoto Developer Account](https://yoto.dev/)
-- Yoto OAuth credentials (Client ID & Secret)
+- A Yoto OAuth Client ID (public client, no secret)
 - A physical Yoto MYO card (optional, for linking the playlist)
 
 ### Installation
@@ -60,8 +60,10 @@ A Next.js application that automatically creates and updates Yoto MYO (Make Your
 
    ```env
    YOTO_CLIENT_ID=your_client_id_here
-   YOTO_CLIENT_SECRET=your_client_secret_here
    ```
+
+   **Note:** Yoto developer apps are OAuth public clients — there is no client
+   secret. Authentication uses PKCE instead (see [yoto.dev](https://yoto.dev/authentication/browser-auth/)).
 
    **Note:** No need for `NEXT_PUBLIC_APP_URL` - the app auto-detects the correct URL at runtime!
 
@@ -148,7 +150,6 @@ A Next.js application that automatically creates and updates Yoto MYO (Make Your
 
    ```bash
    fly secrets set YOTO_CLIENT_ID=your_client_id
-   fly secrets set YOTO_CLIENT_SECRET=your_client_secret
    ```
 
 5. **Deploy**
