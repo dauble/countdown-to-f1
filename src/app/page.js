@@ -300,11 +300,11 @@ export default function Home() {
 
             {refreshResult && (
               <div className={styles.success}>
-                <h2>✅ {refreshResult.message}</h2>
-                
+                <h2>✅ {refreshResult.message || refreshResult.reason}</h2>
+
                 <div className={styles.refreshStatus}>
                   <h3>🔄 Playlist Refresh Status</h3>
-                  
+
                   <div className={styles.dataSource}>
                     <h4>📡 Data Source</h4>
                     <p><strong>Type:</strong> {refreshResult.dataSource.type}</p>
@@ -312,13 +312,21 @@ export default function Home() {
                     <p><strong>Last Updated:</strong> {new Date(refreshResult.dataSource.lastUpdated).toLocaleString()}</p>
                   </div>
 
-                  <div className={styles.raceInfo}>
-                    <h4>🏁 Race Information</h4>
-                    <p><strong>Name:</strong> {refreshResult.race.name}</p>
-                    <p><strong>Location:</strong> {refreshResult.race.location}, {refreshResult.race.country}</p>
-                    <p><strong>Date:</strong> {refreshResult.race.date}</p>
-                    <p><strong>Time:</strong> {refreshResult.race.time}</p>
-                  </div>
+                  {refreshResult.skipped && (
+                    <p className={styles.refreshDescription}>
+                      No TTS regeneration was needed — the F1 data hasn&apos;t changed since the last refresh.
+                    </p>
+                  )}
+
+                  {refreshResult.race && (
+                    <div className={styles.raceInfo}>
+                      <h4>🏁 Race Information</h4>
+                      <p><strong>Name:</strong> {refreshResult.race.name}</p>
+                      <p><strong>Location:</strong> {refreshResult.race.location}, {refreshResult.race.country}</p>
+                      <p><strong>Date:</strong> {refreshResult.race.date}</p>
+                      <p><strong>Time:</strong> {refreshResult.race.time}</p>
+                    </div>
+                  )}
 
                   {refreshResult.sessions && refreshResult.sessions.length > 0 && (
                     <div className={styles.sessions}>
