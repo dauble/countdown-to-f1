@@ -23,7 +23,11 @@ export async function GET(request) {
   const authUrl = "https://login.yotoplay.com/authorize";
   const params = new URLSearchParams({
     audience: "https://api.yotoplay.com",
-    scope: "offline_access user:content:manage user:icons:manage family:devices:view family:devices:control",
+    // family:devices:view / family:devices:control would also be needed for
+    // deployToAllDevices(), but they require Yoto to pre-approve this app's
+    // client_id for device scopes (contact Yoto dev support to request that).
+    // Device deployment in the webhook is best-effort and non-fatal without them.
+    scope: "offline_access user:content:manage user:icons:manage",
     response_type: "code",
     client_id: process.env.YOTO_CLIENT_ID,
     code_challenge: codeChallenge,
