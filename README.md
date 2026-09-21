@@ -9,7 +9,8 @@ A Next.js application that automatically creates and updates Yoto MYO (Make Your
 - 🏁 **Multi-Session Chapters** - Separate chapters for each F1 session (Practice 1-3, Qualifying, Sprint, Race)
 - 📅 **Race Weekend Overview** - First chapter provides overall race weekend information
 - 🌍 **Automatic Timezone Conversion** - Race times converted to your local timezone via IP address detection
-- 🎙️ **Text-to-Speech** - Uses ElevenLabs via Yoto Labs API to generate audio
+- 🎙️ **Text-to-Speech** - The automated refresh (webhook/Cloudflare Worker) uses ElevenLabs +
+  standard Yoto audio upload; the manual "Generate F1 Card" button uses the Yoto Labs TTS API
 - 🔐 **OAuth Authentication** - Secure authentication with Yoto (required before use)
 - 📱 **Responsive Design** - Works on desktop and mobile devices
 
@@ -18,11 +19,11 @@ A Next.js application that automatically creates and updates Yoto MYO (Make Your
 - 📊 **Real-Time Job Status** - Live polling shows TTS generation progress (queued → processing → completed)
 - 🎵 **Audio File Upload** - Upload your own audio files to create MYO-compatible cards
 - 🔓 **Logout Functionality** - Easily logout and switch Yoto accounts
-- 📡 **Device Deployment** - Automatically deploys to all connected Yoto devices
+- 📡 **Device Deployment** - Automatically deploys to all connected Yoto devices (requires Yoto to pre-approve your OAuth client for `family:devices:view`/`family:devices:control` — see [Troubleshooting](#device-deployment-is-always-null))
 - ☁️ **Cloudflare Worker Integration** - Optional serverless worker for automatic daily content updates
 - 🔄 **Automatic Playlist Refresh** - Manual or scheduled automatic updates from the Cloudflare Worker
 
-**Note:** Cover images and custom icons require special Yoto API permissions not available to standard accounts.
+**Note:** Cover images and custom icons require the `user:content:manage` and `user:icons:manage` OAuth scopes, which the app requests automatically during login.
 
 ## 🚀 Quick Start
 
@@ -120,7 +121,7 @@ A Next.js application that automatically creates and updates Yoto MYO (Make Your
 - **Data Sources**:
   - OpenF1 API for race data
   - ipapi.co for timezone detection
-- **TTS**: Yoto Labs API with ElevenLabs
+- **TTS**: ElevenLabs + standard Yoto audio upload (automated refresh), Yoto Labs TTS API (manual generate)
 - **Storage**: Configstore for local token/card storage
 - **Styling**: CSS Modules
 
@@ -148,9 +149,19 @@ A Next.js application that automatically creates and updates Yoto MYO (Make Your
 
 4. **Set environment variables**
 
+   These are runtime secrets on the Fly app itself (not GitHub Actions secrets):
+
    ```bash
    fly secrets set YOTO_CLIENT_ID=your_client_id
+   fly secrets set ELEVENLABS_API_KEY=your_elevenlabs_api_key
+   fly secrets set CLOUDFLARE_WORKER_URL=https://your-worker.workers.dev
+   fly secrets set WEBHOOK_SECRET=$(openssl rand -hex 32)
    ```
+
+   **Note:** `fly secrets` are per-app. If you ever rename the Fly app or run `fly launch` against a
+   new app (a different `app =` name in `fly.toml`), it gets its own fresh volume and secret store —
+   none of the values above carry over automatically, and any stored Yoto OAuth token is lost too
+   (you'll need to visit `/api/auth/login` again after deploying).
 
 5. **Deploy**
 
@@ -158,10 +169,27 @@ A Next.js application that automatically creates and updates Yoto MYO (Make Your
    fly deploy
    ```
 
+   **Note:** `fly.toml`'s `[http_service].internal_port` must match the port the app actually listens
+   on (`3000`, per the Dockerfile's `EXPOSE 3000` / `next start`). Running `fly launch` again can reset
+   this to `8080`, which causes Fly's proxy to 502 every request ("Machines are not listening on
+   0.0.0.0:8080" in the Fly dashboard's Doctor tool) — if you see that, set `internal_port = 3000` and
+   redeploy.
+
 6. **Set up automatic deployments (optional)**
    - Get your Fly API token: `fly auth token`
    - Add `FLY_API_TOKEN` to GitHub repository secrets
    - Every push to `main` branch will auto-deploy via GitHub Actions!
+
+7. **Set up the automated playlist refresh (optional)**
+
+   The `Refresh F1 Yoto Playlist` GitHub Actions workflow (`.github/workflows/refresh-playlist.yml`)
+   calls the app's webhook on a schedule. It needs two **repository** secrets (Settings → Secrets and
+   variables → Actions), separate from the `fly secrets` above:
+
+   - `APP_URL` — your deployed app's base URL (e.g. `https://countdown-to-f1.fly.dev`). Keep this in
+     sync if you ever rename the Fly app — a stale hostname fails with curl exit code 6
+     ("couldn't resolve host") before the workflow even gets an HTTP response.
+   - `WEBHOOK_SECRET` — must match the value set via `fly secrets set WEBHOOK_SECRET=...` above.
 
 ## 🤝 Contributing
 
@@ -191,6 +219,26 @@ This means the app successfully received the webhook call but the Cloudflare Wor
    curl https://f1-yoto-myo-worker.your-subdomain.workers.dev/health
    curl https://f1-yoto-myo-worker.your-subdomain.workers.dev/playlist
    ```
+
+### GitHub Actions workflow fails with "Process completed with exit code 6" (no HTTP response logged)
+
+Exit code 6 is curl's "couldn't resolve host" — the workflow never even got as far as printing
+`Response code: ...`. This means the `APP_URL` repository secret is empty, unset, or points at a
+hostname that no longer resolves (e.g. left over from before a Fly app rename). Update it:
+
+```bash
+gh secret set APP_URL --repo <owner>/<repo> --body "https://your-app.fly.dev"
+```
+
+### Webhook returns 401 / "Not authenticated. User must connect with Yoto first."
+
+The app has no stored Yoto access token — this is expected right after a fresh deploy or a new Fly
+app/volume (tokens are stored on the mounted volume via Configstore, so a new app starts with none).
+Visit `https://your-app.fly.dev/api/auth/login` and complete the Yoto sign-in flow once to store a
+token.
+
+If instead you get `{"error":"Failed to refresh authentication token. Please reconnect with Yoto."}`,
+the refresh token was revoked or expired — re-authenticate the same way.
 
 ### Webhook returns 400 / "missingVariables"
 
@@ -226,12 +274,10 @@ Set every listed variable as a runtime secret (e.g. `fly secrets set VAR=value`)
 
 ### Cover image not appearing
 
-**Cover images and custom icons require special Yoto API permissions:**
+**Cover images and custom icons require the `user:content:manage` and `user:icons:manage` OAuth scopes:**
 
-- The `/media/coverImage/user/me/upload` endpoint is restricted to special account types
-- Standard OAuth accounts receive "not authorized" errors when attempting uploads
-- This is a Yoto API limitation, not an issue with the app
-- If cover images are important, contact developers@yotoplay.com to request permissions
+- These are requested automatically by `/api/auth/login` — if your token predates this, re-authenticate via `/api/auth/logout` then `/api/auth/login`
+- A 403 with `"User does not have required scope(s)"` in the logs confirms the token needs refreshing
 - The app works perfectly without cover images - all TTS content and functionality remains intact
 
 ### MYO audio upload fails
@@ -266,6 +312,21 @@ Set every listed variable as a runtime secret (e.g. `fly secrets set VAR=value`)
 - Check server logs - they show: "User timezone detected: [timezone]"
 - Verify your IP isn't being blocked by ipapi.co
 - Private/local IPs (192.168.x.x, 10.x.x.x) automatically fall back to system timezone
+
+### Device deployment is always null
+
+The webhook response's `deviceDeployment` field is `null` and devices never get pushed automatically.
+
+- The app currently only requests the `offline_access`, `user:content:manage`, and `user:icons:manage`
+  OAuth scopes. `family:devices:view` and `family:devices:control` are needed to list and deploy to
+  devices, but Yoto rejects the whole login with `access_denied` if you request them before your
+  OAuth client (`YOTO_CLIENT_ID`) has been pre-approved for device scopes.
+- **Fix:** contact Yoto developer support to request device-scope approval for your client ID, then
+  add `family:devices:view family:devices:control` back to the `scope` param in
+  `src/app/api/auth/login/route.js`, redeploy, and re-authenticate via `/api/auth/login`.
+- Until then, this is expected behavior — the webhook still creates/updates the playlist successfully;
+  it just can't push it to devices automatically (see `deployToAllDevices()` in
+  `src/services/yotoService.js`, called as a best-effort, non-fatal step).
 
 ### OAuth redirect issues on deployed app
 

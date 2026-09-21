@@ -15,20 +15,18 @@ This document describes all the features available in the Yoto Formula 1 Card Ge
 
 ## Overview
 
-**Note: Cover image uploads require special Yoto API permissions that are not available to standard accounts.**
+The Yoto F1 app automatically uploads custom cover images and team icons to display as card artwork, using the `user:content:manage` and `user:icons:manage` OAuth scopes.
 
-The Yoto F1 app attempts to automatically upload custom cover images to display as card artwork. However, the `/media/coverImage/user/me/upload` endpoint is restricted and returns "not authorized" errors for most accounts.
+## API Scopes Required
 
-## API Restrictions
+Cover image and icon uploads require the following scopes on the stored access token (requested during `/api/auth/login`):
 
-The cover image upload feature:
+- **`user:content:manage`** — required for `/media/coverImage/user/me/upload` and card content creation
+- **`user:icons:manage`** — required for `/media/displayIcons/user/me/upload` (team/country icons)
 
-- **Requires special permissions** - Not available with standard OAuth `offline_access` scope
-- **Returns permission errors** - "User is not authorized to access this resource with an explicit deny"
-- **Handled gracefully** - The app continues to work without cover images when upload fails
-- **May require account upgrade** - Contact developers@yotoplay.com if cover uploads are important
+If your token was authorized before these scopes were added to the login flow, uploads will fail with a 403 `"User does not have required scope(s)"` error. **Fix:** visit `/api/auth/logout` then `/api/auth/login` again to re-authorize with the correct scopes — the app handles missing cover images/icons gracefully either way and still creates the card.
 
-## How It Works (When Permissions Are Available)
+## How It Works
 
 1. **Automatic Detection**: When you generate a card, the app automatically looks for a cover image in the `public/assets/card-images/` directory
 2. **Smart Upload**: If an image is found AND permissions allow, it's uploaded to Yoto's API with the `autoconvert=true` parameter
@@ -47,11 +45,12 @@ Place your cover image in the `public/assets/card-images/` directory with one of
 
 ### Step 2: Generate Your Card
 
-The app will attempt to upload the image. If you don't have permissions:
+The app will attempt to upload the image. If the stored token lacks the `user:content:manage` scope:
 
-- A note will be logged: "Cover image uploads require special API permissions"
+- The upload will fail and be logged as a non-fatal error
 - The card will be created successfully without the cover image
 - All TTS content and functionality works normally
+- Re-authenticate via `/api/auth/login` to pick up the required scope
 
 ## Image Guidelines
 
@@ -103,11 +102,10 @@ You can find F1 images from:
 
 **Image not appearing?**
 
-- **Most common**: Your account doesn't have cover image upload permissions (API returns "not authorized")
-- Contact developers@yotoplay.com to request special permissions if needed
+- **Most common**: Your stored access token predates the `user:content:manage`/`user:icons:manage` scopes — re-authenticate via `/api/auth/logout` then `/api/auth/login`
 - The app will work perfectly without cover images - all core functionality remains
 
-**Have permissions but upload still failing?**
+**Have the right scopes but upload still failing?**
 
 - Check the file name matches one of the supported names
 - Ensure the image is in the correct directory: `public/assets/card-images/`

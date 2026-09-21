@@ -5,6 +5,35 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.4.2] - 2026-09-21
+
+### Fixed
+
+- **Restored the automated playlist refresh after the Fly.io app rename.** The Fly app was renamed
+  from `yoto-app` to `countdown-to-f1` in a relaunch (2026-09-04), which silently broke the whole
+  automation chain in several independent ways:
+  - `fly.toml`'s `internal_port` was reset to `8080` by the relaunch, but the app (Dockerfile
+    `EXPOSE 3000`, `next start`) still listens on `3000` — Fly's proxy couldn't find a listener and
+    returned 502s for every request. Reverted `internal_port` to `3000`.
+  - The `APP_URL` GitHub Actions repository secret still pointed at the old, now-unresolvable
+    `yoto-app.fly.dev` hostname, so the scheduled workflow failed immediately with curl exit code 6
+    ("couldn't resolve host") before ever reaching the app. Updated it to `countdown-to-f1.fly.dev`.
+  - The new Fly app has its own fresh volume, so `YOTO_CLIENT_ID` and `ELEVENLABS_API_KEY` runtime
+    secrets (and the stored Yoto OAuth token) didn't carry over from the old app. Re-set both secrets
+    and re-authenticated via `/api/auth/login`.
+- **Fixed missing OAuth scopes for content/icon uploads.** `/api/auth/login` only ever requested the
+  `offline_access` scope, so the stored access token never had permission to call the Yoto content
+  and icon upload endpoints — this is what previously looked like an account-tier restriction (see
+  the old "Cover image not appearing" troubleshooting entry) but was actually just a missing scope
+  request. Added `user:content:manage` and `user:icons:manage` to the login flow; cover images and
+  team/country icons now upload successfully.
+  - Also attempted adding `family:devices:view`/`family:devices:control` for automatic device
+    deployment, but Yoto rejects the whole login with `access_denied` for OAuth clients that haven't
+    been pre-approved for device scopes — reverted those two pending that approval. Device deployment
+    remains a best-effort, non-fatal no-op until then.
+- Documented all of the above in the README, `.env.example`, and the GitHub Actions workflow's
+  setup comments, so a future Fly app rename doesn't require re-discovering this from scratch.
+
 ## [1.4.1] - 2026-08-30
 
 ### Fixed
