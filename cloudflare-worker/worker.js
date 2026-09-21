@@ -8,6 +8,8 @@
  * Features:
  * - Scheduled daily refresh of F1 data from OpenF1 API
  * - Serves cached playlist data to Yoto MYO card requests
+ * - Serves the current driver grid via GET /drivers, for other consumers
+ *   (e.g. the fantasy-f1 predictions app) that only need driver data
  * - Handles timezone conversion for race times
  * - Rate-limited API calls to respect OpenF1's Community-tier limits
  *   (up to 3 requests/second and 30 requests/minute, see
@@ -115,7 +117,7 @@ function openf1Fetch(path, options = {}) {
  * @param {Array}  sessions - Array of formatted session objects
  * @returns {Promise<string>} Hex-encoded SHA-256 hash
  */
-async function computeDataHash(race, sessions) {
+async function computeDataHash(race, sessions, drivers = []) {
   const snapshot = JSON.stringify({
     meetingKey: race.meetingKey,
     name: race.name,
@@ -133,6 +135,12 @@ async function computeDataHash(race, sessions) {
       sessionType: s.sessionType,
       dateStart: s.dateStart,
       dateEnd: s.dateEnd,
+    })),
+    // Driver roster changes (mid-season swaps) should also trigger a cache update.
+    drivers: drivers.map(d => ({
+      driverNumber: d.driverNumber,
+      fullName: d.fullName,
+      teamName: d.teamName,
     })),
   });
   const encoded = new TextEncoder().encode(snapshot);
@@ -156,8 +164,8 @@ export default {
       // Fetch fresh F1 data from OpenF1 API
       const freshData = await fetchF1Data();
 
-      // Compute a stable hash of the meaningful race/session fields
-      const newHash = await computeDataHash(freshData.race, freshData.sessions);
+      // Compute a stable hash of the meaningful race/session/driver fields
+      const newHash = await computeDataHash(freshData.race, freshData.sessions, freshData.drivers);
 
       // Compare with the previously stored hash — skip the KV write (and avoid
       // triggering an unnecessary TTS refresh downstream) if nothing has changed
@@ -222,7 +230,7 @@ export default {
         // If no cached data, fetch fresh data
         console.log('No cached data found, fetching fresh data');
         const freshData = await fetchF1Data();
-        const dataHash = await computeDataHash(freshData.race, freshData.sessions);
+        const dataHash = await computeDataHash(freshData.race, freshData.sessions, freshData.drivers);
         const playlistData = { ...freshData, dataHash };
         
         // Store for future requests
@@ -252,11 +260,49 @@ export default {
       }
     }
 
+    // Route: GET /drivers - Return just the cached driver grid
+    if (url.pathname === '/drivers' && request.method === 'GET') {
+      try {
+        const cachedData = await env.F1_DATA.get(CACHE_KEY);
+        let drivers = cachedData ? JSON.parse(cachedData).drivers : null;
+
+        if (!drivers) {
+          // No cached data yet (or cached payload predates this field) — fetch fresh
+          const freshData = await fetchF1Data();
+          const dataHash = await computeDataHash(freshData.race, freshData.sessions, freshData.drivers);
+          await env.F1_DATA.put(CACHE_KEY, JSON.stringify({ ...freshData, dataHash }), {
+            expirationTtl: CACHE_TTL_SECONDS
+          });
+          drivers = freshData.drivers;
+        }
+
+        return new Response(JSON.stringify({ drivers, lastUpdated: new Date().toISOString() }), {
+          headers: {
+            'Content-Type': 'application/json',
+            'Cache-Control': 'public, max-age=3600',
+            ...corsHeaders
+          }
+        });
+      } catch (error) {
+        console.error('Error serving drivers:', error);
+        return new Response(JSON.stringify({
+          error: 'Failed to fetch driver data',
+          message: error.message
+        }), {
+          status: 500,
+          headers: {
+            'Content-Type': 'application/json',
+            ...corsHeaders
+          }
+        });
+      }
+    }
+
     // Route: POST /refresh - Manual refresh trigger (optional)
     if (url.pathname === '/refresh' && request.method === 'POST') {
       try {
         const freshData = await fetchF1Data();
-        const dataHash = await computeDataHash(freshData.race, freshData.sessions);
+        const dataHash = await computeDataHash(freshData.race, freshData.sessions, freshData.drivers);
         const playlistData = { ...freshData, dataHash };
 
         await env.F1_DATA.put(CACHE_KEY, JSON.stringify(playlistData), {
@@ -348,10 +394,14 @@ async function fetchF1Data() {
     weather = await getSessionWeather(sessions[0].sessionKey);
   }
 
+  // Get the current driver grid (roster rarely changes, cached alongside race data)
+  const drivers = await getDriverGrid();
+
   return {
     race: raceData,
     sessions: sessions,
     weather: weather,
+    drivers: drivers,
     lastUpdated: new Date().toISOString()
   };
 }
@@ -466,6 +516,39 @@ async function getSessionWeather(sessionKey) {
   } catch (error) {
     console.error('Error fetching weather:', error);
     return null;
+  }
+}
+
+/**
+ * Get the current driver grid (session_key=latest)
+ */
+async function getDriverGrid() {
+  try {
+    const response = await openf1Fetch('/drivers?session_key=latest');
+
+    if (!response.ok) {
+      console.error('Failed to fetch driver grid');
+      return [];
+    }
+
+    const drivers = await response.json();
+
+    if (!drivers || drivers.length === 0) {
+      return [];
+    }
+
+    return drivers.map(driver => ({
+      driverNumber: driver.driver_number,
+      fullName: driver.full_name,
+      abbreviation: driver.name_acronym,
+      teamName: driver.team_name,
+      teamColour: driver.team_colour,
+      headshotUrl: driver.headshot_url,
+      countryCode: driver.country_code,
+    }));
+  } catch (error) {
+    console.error('Error fetching driver grid:', error);
+    return [];
   }
 }
 
