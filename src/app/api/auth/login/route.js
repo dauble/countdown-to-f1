@@ -23,7 +23,7 @@ export async function GET(request) {
   const authUrl = "https://login.yotoplay.com/authorize";
   const params = new URLSearchParams({
     audience: "https://api.yotoplay.com",
-    scope: "offline_access",
+    scope: "offline_access user:content:manage user:icons:manage family:devices:view family:devices:control",
     response_type: "code",
     client_id: process.env.YOTO_CLIENT_ID,
     code_challenge: codeChallenge,
