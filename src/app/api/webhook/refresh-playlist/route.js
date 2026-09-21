@@ -3,7 +3,7 @@
 // Uses a secret token for authentication
 
 import { getDriverStandings, getTeamStandings } from "@/services/f1Service";
-import { createTextToSpeechPlaylist, buildF1Chapters, deployToAllDevices } from "@/services/yotoService";
+import { createOrUpdateTTSPlaylist, buildF1Chapters, deployToAllDevices } from "@/services/yotoService";
 import { uploadCardIcon, uploadCountryFlagIcon, uploadCardCoverImage, uploadTeamCarIcons } from "@/utils/imageUtils";
 import { getAccessToken, refreshAccessToken, getStoredTokens, getStoredCardId, storeCardId, getStoredPlaylistTitle, storePlaylistTitle, getStoredDataHash, storeDataHash } from "@/utils/authUtils";
 
@@ -262,11 +262,11 @@ export async function POST(request) {
     const title = storedTitle || `F1: ${raceData.name}`;
     console.log(`[Webhook] Using playlist title: "${title}" (stored: ${!!storedTitle})`);
     
-    // Step 10: Create TTS playlist using Yoto Labs TTS API.
-    // Yoto Labs handles TTS generation on their own infrastructure, so no external
-    // API quota is consumed. A new playlist is created when data changes; the
-    // skip-when-unchanged check above prevents unnecessary regeneration.
-    const yotoResult = await createTextToSpeechPlaylist({
+    // Step 10: Create or update the TTS playlist via ElevenLabs + Yoto audio upload.
+    // (Previously used the Yoto Labs TTS API, which 403s for standard accounts —
+    // see createOrUpdateTTSPlaylist in yotoService.js.)
+    // The skip-when-unchanged check above prevents unnecessary regeneration.
+    const yotoResult = await createOrUpdateTTSPlaylist({
       title,
       chapters,
       accessToken,
@@ -300,7 +300,9 @@ export async function POST(request) {
     // Step 12: Return success
     return Response.json({
       success: true,
-      message: "Automated playlist refresh completed successfully (new playlist created)",
+      message: yotoResult.isUpdate
+        ? "Automated playlist refresh completed successfully (existing playlist updated)"
+        : "Automated playlist refresh completed successfully (new playlist created)",
       timestamp: new Date().toISOString(),
       race: {
         name: raceData.name,

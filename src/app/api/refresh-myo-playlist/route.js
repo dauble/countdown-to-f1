@@ -1,9 +1,14 @@
 // API Route to refresh MYO playlist from Cloudflare Worker data
 // This endpoint fetches fresh F1 data from the Cloudflare worker and creates
-// a new MYO playlist via the Yoto Labs TTS API when data has changed.
+// or updates the MYO playlist via ElevenLabs TTS + the standard Yoto audio
+// upload flow when data has changed.
+//
+// Note: this previously used the Yoto Labs TTS API (createTextToSpeechPlaylist),
+// but that endpoint requires special Yoto account permissions and 403s for
+// standard developer accounts — see createOrUpdateTTSPlaylist in yotoService.js.
 
 import { getDriverStandings, getTeamStandings } from "@/services/f1Service";
-import { createTextToSpeechPlaylist, buildF1Chapters, deployToAllDevices } from "@/services/yotoService";
+import { createOrUpdateTTSPlaylist, buildF1Chapters, deployToAllDevices } from "@/services/yotoService";
 import { uploadCardIcon, uploadCountryFlagIcon, uploadCardCoverImage, uploadTeamCarIcons } from "@/utils/imageUtils";
 import { getValidAccessToken, getStoredCardId, storeCardId, getStoredPlaylistTitle, storePlaylistTitle, isAuthError, createAuthErrorResponse, getStoredDataHash, storeDataHash } from "@/utils/authUtils";
 
@@ -174,15 +179,13 @@ export async function POST(request) {
     const title = storedTitle || `F1: ${raceData.name}`;
     console.log(`Using playlist title: "${title}" (stored: ${!!storedTitle})`);
     
-    // Step 12: Create TTS playlist using Yoto Labs TTS API.
-    // Yoto Labs handles TTS generation on their own infrastructure, so no external
-    // API quota is consumed. A new playlist is created when data changes; the
-    // skip-when-unchanged check above prevents unnecessary regeneration.
-    const yotoResult = await createTextToSpeechPlaylist({
+    // Step 12: Create or update the TTS playlist via ElevenLabs + Yoto audio upload.
+    // The skip-when-unchanged check above prevents unnecessary regeneration.
+    const yotoResult = await createOrUpdateTTSPlaylist({
       title,
       chapters,
       accessToken,
-      cardId: existingCardId, // Accepted but not used by Labs API (always creates new)
+      cardId: existingCardId,
       coverImageUrl,
     });
 

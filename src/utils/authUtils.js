@@ -2,6 +2,11 @@
 import Configstore from "configstore";
 import path from "path";
 
+// Name of the short-lived cookie that carries the PKCE code_verifier from
+// /api/auth/login to /api/auth/callback (Yoto apps are OAuth public clients
+// with no client secret; see https://yoto.dev/authentication/browser-auth/)
+export const PKCE_VERIFIER_COOKIE = "yoto_pkce_verifier";
+
 const configPath = process.env.FLY_APP_NAME 
   ? path.join('/data', '.config-yoto-f1-card-tokens')
   : undefined; // Uses default local path
@@ -142,7 +147,6 @@ export async function refreshAccessToken() {
       body: new URLSearchParams({
         grant_type: 'refresh_token',
         client_id: process.env.YOTO_CLIENT_ID,
-        client_secret: process.env.YOTO_CLIENT_SECRET,
         refresh_token: tokens.refreshToken,
       }),
     });

@@ -74,10 +74,19 @@ jobs:
 # 
 # 2. Add these secrets:
 #    - APP_URL:        Your deployed app URL (e.g., https://your-app.fly.dev)
+#                      If you ever rename/relaunch the Fly app, update this too — a stale
+#                      hostname fails with curl exit code 6 ("couldn't resolve host") and
+#                      no HTTP response is ever logged.
 #    - WEBHOOK_SECRET: Your webhook secret (must match WEBHOOK_SECRET in fly secrets)
-# 
-#    The app also requires CLOUDFLARE_WORKER_URL to be set as a runtime secret:
+#
+#    The app also requires CLOUDFLARE_WORKER_URL, YOTO_CLIENT_ID, and ELEVENLABS_API_KEY to be
+#    set as runtime secrets (these are NOT GitHub Actions secrets):
 #      fly secrets set CLOUDFLARE_WORKER_URL=https://f1-yoto-myo-worker.X.workers.dev
+#      fly secrets set YOTO_CLIENT_ID=<your Yoto OAuth client id>
+#      fly secrets set ELEVENLABS_API_KEY=<your ElevenLabs API key>
+#
+#    A fresh Fly app (or one that was renamed) also has no stored Yoto login — visit
+#    https://your-app.fly.dev/api/auth/login once to authenticate before the webhook will work.
 # 
 # 3. Enable the workflow:
 #    - Go to Actions tab
