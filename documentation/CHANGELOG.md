@@ -5,6 +5,17 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.5.1] - 2026-10-05
+
+### Fixed
+
+- **The Cloudflare Worker now refreshes its KV data on every scheduled run.** The scheduled handler
+  only wrote to KV when the `dataHash` changed, so fields excluded from the hash (notably weather)
+  stayed stale in KV and `/playlist` kept serving them. The worker now always writes the fresh
+  payload to KV. TTS regeneration is still gated by `dataHash` and the weekly limit in the app's
+  refresh webhook, so ElevenLabs usage is unchanged. Requires redeploying the worker
+  (`npx wrangler deploy` in `cloudflare-worker/`).
+
 ## [1.5.0] - 2026-10-05
 
 ### Added

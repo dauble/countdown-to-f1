@@ -156,27 +156,20 @@ export default {
       // Fetch fresh F1 data from OpenF1 API
       const freshData = await fetchF1Data();
 
-      // Compute a stable hash of the meaningful race/session fields
+      // Compute a stable hash of the meaningful race/session fields. The app compares
+      // this hash to decide whether TTS audio needs regenerating; it is not used to
+      // decide whether KV gets refreshed.
       const newHash = await computeDataHash(freshData.race, freshData.sessions);
 
-      // Compare with the previously stored hash — skip the KV write (and avoid
-      // triggering an unnecessary TTS refresh downstream) if nothing has changed
-      const cachedRaw = await env.F1_DATA.get(CACHE_KEY);
-      if (cachedRaw) {
-        const cached = JSON.parse(cachedRaw);
-        if (cached.dataHash === newHash) {
-          console.log('No changes detected in F1 data — skipping KV update, dataHash:', newHash);
-          return;
-        }
-      }
-
-      // Data has changed (or there was no previous cache) — persist the new payload
+      // Always write the fresh payload so KV never serves stale fields (e.g. weather,
+      // which is excluded from the hash). Downstream TTS regeneration is still gated
+      // by dataHash in the app's refresh webhook.
       const playlistData = { ...freshData, dataHash: newHash };
       await env.F1_DATA.put(CACHE_KEY, JSON.stringify(playlistData), {
         expirationTtl: CACHE_TTL_SECONDS
       });
 
-      console.log('F1 data changed — KV storage updated, dataHash:', newHash);
+      console.log('F1 data refreshed — KV storage updated, dataHash:', newHash);
     } catch (error) {
       console.error('Error updating F1 data:', error);
       // Don't throw - let the worker continue serving cached data
