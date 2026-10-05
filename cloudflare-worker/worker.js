@@ -110,14 +110,16 @@ function openf1Fetch(path, options = {}) {
 }
 
 /**
- * Compute a stable SHA-256 hash of the meaningful race and session fields.
- * Weather data is intentionally excluded — it is live telemetry that can
- * change frequently and does not warrant regenerating TTS audio.
+ * Compute a stable SHA-256 hash of the meaningful race, session, roster and
+ * standings fields. Weather data is intentionally excluded — it is live telemetry
+ * that can change frequently and does not warrant regenerating TTS audio.
  * @param {Object} race - Formatted race object
  * @param {Array}  sessions - Array of formatted session objects
+ * @param {Array}  drivers - Driver grid from getDriverGrid()
+ * @param {Object} standings - { drivers, teams } from getStandings()
  * @returns {Promise<string>} Hex-encoded SHA-256 hash
  */
-async function computeDataHash(race, sessions, drivers = []) {
+async function computeDataHash(race, sessions, drivers = [], standings = { drivers: [], teams: [] }) {
   const snapshot = JSON.stringify({
     meetingKey: race.meetingKey,
     name: race.name,
@@ -137,6 +139,20 @@ async function computeDataHash(race, sessions, drivers = []) {
       dateEnd: s.dateEnd,
     })),
     // Driver roster changes (mid-season swaps) should also trigger a cache update.
+    // Standings changes (after each race) should also trigger a TTS regeneration.
+    standings: {
+      drivers: standings.drivers.map(d => ({
+        position: d.position,
+        driverNumber: d.driverNumber,
+        team: d.team,
+        points: d.points,
+      })),
+      teams: standings.teams.map(t => ({
+        position: t.position,
+        team: t.team,
+        points: t.points,
+      })),
+    },
     drivers: drivers.map(d => ({
       driverNumber: d.driverNumber,
       fullName: d.fullName,
@@ -165,7 +181,7 @@ export default {
       const freshData = await fetchF1Data();
 
       // Compute a stable hash of the meaningful race/session/driver fields
-      const newHash = await computeDataHash(freshData.race, freshData.sessions, freshData.drivers);
+      const newHash = await computeDataHash(freshData.race, freshData.sessions, freshData.drivers, freshData.standings);
 
       // Compare with the previously stored hash — skip the KV write (and avoid
       // triggering an unnecessary TTS refresh downstream) if nothing has changed
@@ -230,7 +246,7 @@ export default {
         // If no cached data, fetch fresh data
         console.log('No cached data found, fetching fresh data');
         const freshData = await fetchF1Data();
-        const dataHash = await computeDataHash(freshData.race, freshData.sessions, freshData.drivers);
+        const dataHash = await computeDataHash(freshData.race, freshData.sessions, freshData.drivers, freshData.standings);
         const playlistData = { ...freshData, dataHash };
         
         // Store for future requests
@@ -269,7 +285,7 @@ export default {
         if (!drivers) {
           // No cached data yet (or cached payload predates this field) — fetch fresh
           const freshData = await fetchF1Data();
-          const dataHash = await computeDataHash(freshData.race, freshData.sessions, freshData.drivers);
+          const dataHash = await computeDataHash(freshData.race, freshData.sessions, freshData.drivers, freshData.standings);
           await env.F1_DATA.put(CACHE_KEY, JSON.stringify({ ...freshData, dataHash }), {
             expirationTtl: CACHE_TTL_SECONDS
           });
@@ -302,7 +318,7 @@ export default {
     if (url.pathname === '/refresh' && request.method === 'POST') {
       try {
         const freshData = await fetchF1Data();
-        const dataHash = await computeDataHash(freshData.race, freshData.sessions, freshData.drivers);
+        const dataHash = await computeDataHash(freshData.race, freshData.sessions, freshData.drivers, freshData.standings);
         const playlistData = { ...freshData, dataHash };
 
         await env.F1_DATA.put(CACHE_KEY, JSON.stringify(playlistData), {
@@ -397,13 +413,101 @@ async function fetchF1Data() {
   // Get the current driver grid (roster rarely changes, cached alongside race data)
   const drivers = await getDriverGrid();
 
+  // Get championship standings (top 5 drivers and teams) for the hash and the payload
+  const standings = await getStandings();
+
   return {
     race: raceData,
     sessions: sessions,
     weather: weather,
     drivers: drivers,
+    standings: standings,
     lastUpdated: new Date().toISOString()
   };
+}
+
+/**
+ * Get the latest completed race session, falling back to last year's races
+ * when none have happened yet this year. Throws on failure.
+ */
+async function getLatestCompletedRaceSession() {
+  const now = new Date();
+
+  const fetchRaceSessions = async (year) => {
+    const response = await openf1Fetch(`/sessions?session_name=Race&year=${year}`);
+    if (!response.ok) {
+      throw new Error(`Failed to fetch race sessions for ${year}`);
+    }
+    return response.json();
+  };
+
+  const completedSessions = (sessions) => (sessions || [])
+    .filter(s => new Date(s.date_start) <= now)
+    .sort((a, b) => new Date(a.date_start) - new Date(b.date_start));
+
+  let completed = completedSessions(await fetchRaceSessions(now.getUTCFullYear()));
+  if (completed.length === 0) {
+    completed = completedSessions(await fetchRaceSessions(now.getUTCFullYear() - 1));
+  }
+  if (completed.length === 0) {
+    throw new Error('No completed race sessions found');
+  }
+
+  return completed[completed.length - 1];
+}
+
+/**
+ * Get the top 5 driver and team championship standings from the latest completed race.
+ *
+ * Unlike the app's standings helpers, failures are not replaced with mock data: this
+ * throws, so the scheduled run keeps the last good KV payload instead of hashing
+ * placeholder standings and triggering a TTS regeneration.
+ */
+async function getStandings() {
+  const lastSession = await getLatestCompletedRaceSession();
+  const sessionKey = lastSession.session_key;
+
+  const fetchJson = async (path, label) => {
+    const response = await openf1Fetch(path);
+    if (!response.ok) {
+      throw new Error(`Failed to fetch ${label} (HTTP ${response.status})`);
+    }
+    const data = await response.json();
+    if (!data || data.length === 0) {
+      throw new Error(`No ${label} returned`);
+    }
+    return data;
+  };
+
+  const championship = await fetchJson(`/championship_drivers?session_key=${sessionKey}`, 'driver championship');
+  const teamChampionship = await fetchJson(`/championship_teams?session_key=${sessionKey}`, 'team championship');
+  const driverDetails = await fetchJson(`/drivers?session_key=${sessionKey}`, 'driver details');
+  const driverMap = new Map(driverDetails.map(d => [d.driver_number, d]));
+
+  const drivers = [...championship]
+    .sort((a, b) => a.position_current - b.position_current)
+    .slice(0, 5)
+    .map(entry => {
+      const driver = driverMap.get(entry.driver_number);
+      return {
+        position: entry.position_current,
+        driverNumber: entry.driver_number,
+        driver: driver ? (driver.full_name || `${driver.first_name} ${driver.last_name}`) : `Driver ${entry.driver_number}`,
+        team: driver?.team_name || 'Unknown Team',
+        points: entry.points_current,
+      };
+    });
+
+  const teams = [...teamChampionship]
+    .sort((a, b) => a.position_current - b.position_current)
+    .slice(0, 5)
+    .map(entry => ({
+      position: entry.position_current,
+      team: entry.team_name,
+      points: entry.points_current,
+    }));
+
+  return { drivers, teams };
 }
 
 /**

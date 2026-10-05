@@ -5,6 +5,25 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.5.2] - 2026-10-05
+
+### Changed
+
+- **Championship standings are part of the Cloudflare Worker's KV data hash.** The worker now fetches
+  the top 5 driver and team standings from the latest completed race (OpenF1 `championship_drivers`
+  and `championship_teams`) and stores them in the KV payload under `standings`. The `dataHash` covers
+  position, driver/team, and points, so a standings change after a race triggers a TTS regeneration in
+  the app's refresh webhook. Previously the hash ignored standings, so standings chapters could go
+  stale until the race or session data changed.
+- Standings lookups fail loudly in the worker: a failed or empty OpenF1 response makes the scheduled
+  run keep the last good KV payload rather than hashing placeholder data.
+
+### Notes
+
+- The first run after deploying this release changes the hash, so the app regenerates TTS audio once.
+  That uses ElevenLabs credits, subject to the weekly limit and quota handling from 1.5.0.
+- Requires redeploying the worker (`npx wrangler deploy` in `cloudflare-worker/`).
+
 ## [1.5.0] - 2026-10-05
 
 ### Added
