@@ -139,15 +139,16 @@ async function computeDataHash(race, sessions, drivers = [], standings = { drive
       dateEnd: s.dateEnd,
     })),
     // Driver roster changes (mid-season swaps) should also trigger a cache update.
-    // Standings changes (after each race) should also trigger a TTS regeneration.
+    // Only the top 5 standings appear on the playlist, so only they affect TTS regeneration.
+    // Changes further down the table are stored in KV but do not trigger a regeneration.
     standings: {
-      drivers: standings.drivers.map(d => ({
+      drivers: standings.drivers.slice(0, 5).map(d => ({
         position: d.position,
         driverNumber: d.driverNumber,
         team: d.team,
         points: d.points,
       })),
-      teams: standings.teams.map(t => ({
+      teams: standings.teams.slice(0, 5).map(t => ({
         position: t.position,
         team: t.team,
         points: t.points,
@@ -180,27 +181,20 @@ export default {
       // Fetch fresh F1 data from OpenF1 API
       const freshData = await fetchF1Data();
 
-      // Compute a stable hash of the meaningful race/session/driver fields
+      // Compute a stable hash of the meaningful race, session, roster and standings fields.
+      // The app compares this hash to decide whether TTS audio needs regenerating; it is not
+      // used to decide whether KV gets refreshed.
       const newHash = await computeDataHash(freshData.race, freshData.sessions, freshData.drivers, freshData.standings);
 
-      // Compare with the previously stored hash — skip the KV write (and avoid
-      // triggering an unnecessary TTS refresh downstream) if nothing has changed
-      const cachedRaw = await env.F1_DATA.get(CACHE_KEY);
-      if (cachedRaw) {
-        const cached = JSON.parse(cachedRaw);
-        if (cached.dataHash === newHash) {
-          console.log('No changes detected in F1 data — skipping KV update, dataHash:', newHash);
-          return;
-        }
-      }
-
-      // Data has changed (or there was no previous cache) — persist the new payload
+      // Always write the fresh payload so KV never serves stale fields (e.g. weather,
+      // which is excluded from the hash). Downstream TTS regeneration is still gated
+      // by dataHash in the app's refresh webhook.
       const playlistData = { ...freshData, dataHash: newHash };
       await env.F1_DATA.put(CACHE_KEY, JSON.stringify(playlistData), {
         expirationTtl: CACHE_TTL_SECONDS
       });
 
-      console.log('F1 data changed — KV storage updated, dataHash:', newHash);
+      console.log('F1 data refreshed — KV storage updated, dataHash:', newHash);
     } catch (error) {
       console.error('Error updating F1 data:', error);
       // Don't throw - let the worker continue serving cached data
@@ -413,7 +407,7 @@ async function fetchF1Data() {
   // Get the current driver grid (roster rarely changes, cached alongside race data)
   const drivers = await getDriverGrid();
 
-  // Get championship standings (top 5 drivers and teams) for the hash and the payload
+  // Get all driver and team championship standings for the KV payload (the hash uses the top 5)
   const standings = await getStandings();
 
   return {
@@ -457,7 +451,7 @@ async function getLatestCompletedRaceSession() {
 }
 
 /**
- * Get the top 5 driver and team championship standings from the latest completed race.
+ * Get every driver and team championship standing from the latest completed race.
  *
  * Unlike the app's standings helpers, failures are not replaced with mock data: this
  * throws, so the scheduled run keeps the last good KV payload instead of hashing
@@ -486,7 +480,6 @@ async function getStandings() {
 
   const drivers = [...championship]
     .sort((a, b) => a.position_current - b.position_current)
-    .slice(0, 5)
     .map(entry => {
       const driver = driverMap.get(entry.driver_number);
       return {
@@ -500,7 +493,6 @@ async function getStandings() {
 
   const teams = [...teamChampionship]
     .sort((a, b) => a.position_current - b.position_current)
-    .slice(0, 5)
     .map(entry => ({
       position: entry.position_current,
       team: entry.team_name,

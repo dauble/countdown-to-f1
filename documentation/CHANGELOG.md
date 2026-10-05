@@ -9,12 +9,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- **Championship standings are part of the Cloudflare Worker's KV data hash.** The worker now fetches
-  the top 5 driver and team standings from the latest completed race (OpenF1 `championship_drivers`
-  and `championship_teams`) and stores them in the KV payload under `standings`. The `dataHash` covers
-  position, driver/team, and points, so a standings change after a race triggers a TTS regeneration in
-  the app's refresh webhook. Previously the hash ignored standings, so standings chapters could go
-  stale until the race or session data changed.
+- **Full championship standings are stored in the Cloudflare Worker's KV payload.** The worker now
+  fetches every driver and team standing from the latest completed race (OpenF1
+  `championship_drivers` and `championship_teams`) and stores them under `standings` in the KV payload.
+- **The top 5 standings are part of the `dataHash`.** Only the top 5 appear on the playlist, so only
+  those affect the hash. A change to position, driver/team, or points in the top 5 triggers a TTS
+  regeneration in the app's refresh webhook. Changes further down the table are stored in KV but do not
+  trigger a regeneration. Previously the hash ignored standings, so standings chapters could go stale
+  until the race or session data changed.
 - Standings lookups fail loudly in the worker: a failed or empty OpenF1 response makes the scheduled
   run keep the last good KV payload rather than hashing placeholder data.
 
@@ -23,6 +25,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The first run after deploying this release changes the hash, so the app regenerates TTS audio once.
   That uses ElevenLabs credits, subject to the weekly limit and quota handling from 1.5.0.
 - Requires redeploying the worker (`npx wrangler deploy` in `cloudflare-worker/`).
+## [1.5.1] - 2026-10-05
+
+### Fixed
+
+- **The Cloudflare Worker now refreshes its KV data on every scheduled run.** The scheduled handler
+  only wrote to KV when the `dataHash` changed, so fields excluded from the hash (notably weather)
+  stayed stale in KV and `/playlist` kept serving them. The worker now always writes the fresh
+  payload to KV. TTS regeneration is still gated by `dataHash` and the weekly limit in the app's
+  refresh webhook, so ElevenLabs usage is unchanged. Requires redeploying the worker
+  (`npx wrangler deploy` in `cloudflare-worker/`).
 
 ## [1.5.0] - 2026-10-05
 
