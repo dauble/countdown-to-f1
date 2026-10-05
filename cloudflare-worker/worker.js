@@ -110,14 +110,16 @@ function openf1Fetch(path, options = {}) {
 }
 
 /**
- * Compute a stable SHA-256 hash of the meaningful race and session fields.
- * Weather data is intentionally excluded — it is live telemetry that can
- * change frequently and does not warrant regenerating TTS audio.
+ * Compute a stable SHA-256 hash of the meaningful race, session, roster and
+ * standings fields. Weather data is intentionally excluded — it is live telemetry
+ * that can change frequently and does not warrant regenerating TTS audio.
  * @param {Object} race - Formatted race object
  * @param {Array}  sessions - Array of formatted session objects
+ * @param {Array}  drivers - Driver grid from getDriverGrid()
+ * @param {Object} standings - { drivers, teams } from getStandings()
  * @returns {Promise<string>} Hex-encoded SHA-256 hash
  */
-async function computeDataHash(race, sessions, drivers = []) {
+async function computeDataHash(race, sessions, drivers = [], standings = { drivers: [], teams: [] }) {
   const snapshot = JSON.stringify({
     meetingKey: race.meetingKey,
     name: race.name,
@@ -137,6 +139,21 @@ async function computeDataHash(race, sessions, drivers = []) {
       dateEnd: s.dateEnd,
     })),
     // Driver roster changes (mid-season swaps) should also trigger a cache update.
+    // Only the top 5 standings appear on the playlist, so only they affect TTS regeneration.
+    // Changes further down the table are stored in KV but do not trigger a regeneration.
+    standings: {
+      drivers: standings.drivers.slice(0, 5).map(d => ({
+        position: d.position,
+        driverNumber: d.driverNumber,
+        team: d.team,
+        points: d.points,
+      })),
+      teams: standings.teams.slice(0, 5).map(t => ({
+        position: t.position,
+        team: t.team,
+        points: t.points,
+      })),
+    },
     drivers: drivers.map(d => ({
       driverNumber: d.driverNumber,
       fullName: d.fullName,
@@ -164,10 +181,10 @@ export default {
       // Fetch fresh F1 data from OpenF1 API
       const freshData = await fetchF1Data();
 
-      // Compute a stable hash of the meaningful race/session/driver fields. The app compares
-      // this hash to decide whether TTS audio needs regenerating; it is not used to
-      // decide whether KV gets refreshed.
-      const newHash = await computeDataHash(freshData.race, freshData.sessions, freshData.drivers);
+      // Compute a stable hash of the meaningful race, session, roster and standings fields.
+      // The app compares this hash to decide whether TTS audio needs regenerating; it is not
+      // used to decide whether KV gets refreshed.
+      const newHash = await computeDataHash(freshData.race, freshData.sessions, freshData.drivers, freshData.standings);
 
       // Always write the fresh payload so KV never serves stale fields (e.g. weather,
       // which is excluded from the hash). Downstream TTS regeneration is still gated
@@ -223,7 +240,7 @@ export default {
         // If no cached data, fetch fresh data
         console.log('No cached data found, fetching fresh data');
         const freshData = await fetchF1Data();
-        const dataHash = await computeDataHash(freshData.race, freshData.sessions, freshData.drivers);
+        const dataHash = await computeDataHash(freshData.race, freshData.sessions, freshData.drivers, freshData.standings);
         const playlistData = { ...freshData, dataHash };
         
         // Store for future requests
@@ -262,7 +279,7 @@ export default {
         if (!drivers) {
           // No cached data yet (or cached payload predates this field) — fetch fresh
           const freshData = await fetchF1Data();
-          const dataHash = await computeDataHash(freshData.race, freshData.sessions, freshData.drivers);
+          const dataHash = await computeDataHash(freshData.race, freshData.sessions, freshData.drivers, freshData.standings);
           await env.F1_DATA.put(CACHE_KEY, JSON.stringify({ ...freshData, dataHash }), {
             expirationTtl: CACHE_TTL_SECONDS
           });
@@ -295,7 +312,7 @@ export default {
     if (url.pathname === '/refresh' && request.method === 'POST') {
       try {
         const freshData = await fetchF1Data();
-        const dataHash = await computeDataHash(freshData.race, freshData.sessions, freshData.drivers);
+        const dataHash = await computeDataHash(freshData.race, freshData.sessions, freshData.drivers, freshData.standings);
         const playlistData = { ...freshData, dataHash };
 
         await env.F1_DATA.put(CACHE_KEY, JSON.stringify(playlistData), {
@@ -390,13 +407,99 @@ async function fetchF1Data() {
   // Get the current driver grid (roster rarely changes, cached alongside race data)
   const drivers = await getDriverGrid();
 
+  // Get all driver and team championship standings for the KV payload (the hash uses the top 5)
+  const standings = await getStandings();
+
   return {
     race: raceData,
     sessions: sessions,
     weather: weather,
     drivers: drivers,
+    standings: standings,
     lastUpdated: new Date().toISOString()
   };
+}
+
+/**
+ * Get the latest completed race session, falling back to last year's races
+ * when none have happened yet this year. Throws on failure.
+ */
+async function getLatestCompletedRaceSession() {
+  const now = new Date();
+
+  const fetchRaceSessions = async (year) => {
+    const response = await openf1Fetch(`/sessions?session_name=Race&year=${year}`);
+    if (!response.ok) {
+      throw new Error(`Failed to fetch race sessions for ${year}`);
+    }
+    return response.json();
+  };
+
+  const completedSessions = (sessions) => (sessions || [])
+    .filter(s => new Date(s.date_start) <= now)
+    .sort((a, b) => new Date(a.date_start) - new Date(b.date_start));
+
+  let completed = completedSessions(await fetchRaceSessions(now.getUTCFullYear()));
+  if (completed.length === 0) {
+    completed = completedSessions(await fetchRaceSessions(now.getUTCFullYear() - 1));
+  }
+  if (completed.length === 0) {
+    throw new Error('No completed race sessions found');
+  }
+
+  return completed[completed.length - 1];
+}
+
+/**
+ * Get every driver and team championship standing from the latest completed race.
+ *
+ * Unlike the app's standings helpers, failures are not replaced with mock data: this
+ * throws, so the scheduled run keeps the last good KV payload instead of hashing
+ * placeholder standings and triggering a TTS regeneration.
+ */
+async function getStandings() {
+  const lastSession = await getLatestCompletedRaceSession();
+  const sessionKey = lastSession.session_key;
+
+  const fetchJson = async (path, label) => {
+    const response = await openf1Fetch(path);
+    if (!response.ok) {
+      throw new Error(`Failed to fetch ${label} (HTTP ${response.status})`);
+    }
+    const data = await response.json();
+    if (!data || data.length === 0) {
+      throw new Error(`No ${label} returned`);
+    }
+    return data;
+  };
+
+  const championship = await fetchJson(`/championship_drivers?session_key=${sessionKey}`, 'driver championship');
+  const teamChampionship = await fetchJson(`/championship_teams?session_key=${sessionKey}`, 'team championship');
+  const driverDetails = await fetchJson(`/drivers?session_key=${sessionKey}`, 'driver details');
+  const driverMap = new Map(driverDetails.map(d => [d.driver_number, d]));
+
+  const drivers = [...championship]
+    .sort((a, b) => a.position_current - b.position_current)
+    .map(entry => {
+      const driver = driverMap.get(entry.driver_number);
+      return {
+        position: entry.position_current,
+        driverNumber: entry.driver_number,
+        driver: driver ? (driver.full_name || `${driver.first_name} ${driver.last_name}`) : `Driver ${entry.driver_number}`,
+        team: driver?.team_name || 'Unknown Team',
+        points: entry.points_current,
+      };
+    });
+
+  const teams = [...teamChampionship]
+    .sort((a, b) => a.position_current - b.position_current)
+    .map(entry => ({
+      position: entry.position_current,
+      team: entry.team_name,
+      points: entry.points_current,
+    }));
+
+  return { drivers, teams };
 }
 
 /**

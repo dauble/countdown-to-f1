@@ -7,10 +7,10 @@ compatibility_date = "2024-01-01"
 binding = "F1_DATA"
 id = "d3e9ce1a8db6447a80cde6e0be1df9f6"
 
-# Refresh every 15 minutes. Each run makes ~3 OpenF1 calls (meetings, sessions,
-# weather), well within the Community-tier limit of 3 req/s / 30 req/min even
-# run back-to-back, and the worker skips the KV write entirely when nothing
-# has changed, so this stays far under Cloudflare's free-tier KV write quota.
+# Refresh every 15 minutes. Each run makes ~8 OpenF1 calls (meetings, sessions,
+# weather, driver grid, and the standings lookups), well within the Community-tier
+# limit of 3 req/s / 30 req/min even run back-to-back. The KV payload is written on
+# every run (~96 writes/day), which stays far under Cloudflare's free-tier KV write quota.
 [triggers]
 crons = ["*/15 * * * *"]
 
