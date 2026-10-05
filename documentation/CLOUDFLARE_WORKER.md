@@ -136,6 +136,41 @@ Returns the cached F1 playlist data in JSON format.
     "trackTemperature": 35,
     "humidity": 65
   },
+  "drivers": [
+    {
+      "driverNumber": 1,
+      "fullName": "Max Verstappen",
+      "abbreviation": "VER",
+      "teamName": "Red Bull Racing",
+      "teamColour": "3671C6",
+      "headshotUrl": "https://...",
+      "countryCode": "NED"
+    }
+  ],
+  "lastUpdated": "2024-03-22T06:00:00.000Z"
+}
+```
+
+### GET /drivers
+
+Returns just the cached driver grid (a slice of the same KV payload as `/playlist`), for
+consumers — like the [fantasy-f1](https://github.com/dauble/fantasy-f1) predictions app —
+that only need driver data and not the full race/session/weather payload.
+
+**Response:**
+```json
+{
+  "drivers": [
+    {
+      "driverNumber": 1,
+      "fullName": "Max Verstappen",
+      "abbreviation": "VER",
+      "teamName": "Red Bull Racing",
+      "teamColour": "3671C6",
+      "headshotUrl": "https://...",
+      "countryCode": "NED"
+    }
+  ],
   "lastUpdated": "2024-03-22T06:00:00.000Z"
 }
 ```
