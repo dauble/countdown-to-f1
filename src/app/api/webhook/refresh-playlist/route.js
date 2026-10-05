@@ -5,7 +5,10 @@
 import { getDriverStandings, getTeamStandings } from "@/services/f1Service";
 import { createOrUpdateTTSPlaylist, buildF1Chapters, deployToAllDevices } from "@/services/yotoService";
 import { uploadCardIcon, uploadCountryFlagIcon, uploadCardCoverImage, uploadTeamCarIcons } from "@/utils/imageUtils";
-import { getAccessToken, refreshAccessToken, getStoredTokens, getStoredCardId, storeCardId, getStoredPlaylistTitle, storePlaylistTitle, getStoredDataHash, storeDataHash } from "@/utils/authUtils";
+import { getAccessToken, refreshAccessToken, getStoredTokens, getStoredCardId, storeCardId, getStoredPlaylistTitle, storePlaylistTitle, getStoredDataHash, storeDataHash, getStoredTtsUpdatedAt, storeTtsUpdatedAt } from "@/utils/authUtils";
+
+// ElevenLabs credits are limited, so regenerate TTS audio at most once per week
+const TTS_MIN_INTERVAL_MS = 7 * 24 * 60 * 60 * 1000;
 
 /**
  * Webhook endpoint for automated playlist refresh
@@ -179,6 +182,24 @@ export async function POST(request) {
       }
     }
 
+    // Step 4c: Limit TTS regeneration to once per week to conserve ElevenLabs credits
+    const lastTtsUpdatedAt = getStoredTtsUpdatedAt();
+    if (lastTtsUpdatedAt && Date.now() - lastTtsUpdatedAt < TTS_MIN_INTERVAL_MS) {
+      const nextEligibleAt = new Date(lastTtsUpdatedAt + TTS_MIN_INTERVAL_MS).toISOString();
+      console.log('[Webhook] TTS was regenerated recently — skipping until', nextEligibleAt);
+      return Response.json({
+        success: true,
+        skipped: true,
+        reason: `Audio was last regenerated within the weekly limit. Next eligible update: ${nextEligibleAt}.`,
+        dataSource: {
+          url: workerUrl,
+          lastUpdated: workerData.lastUpdated,
+          dataHash: newDataHash ?? null,
+        },
+        timestamp: new Date().toISOString(),
+      });
+    }
+
     // Step 5: Extract and format race data
     const raceData = workerData.race;
     const sessions = workerData.sessions || [];
@@ -266,13 +287,37 @@ export async function POST(request) {
     // (Previously used the Yoto Labs TTS API, which 403s for standard accounts —
     // see createOrUpdateTTSPlaylist in yotoService.js.)
     // The skip-when-unchanged check above prevents unnecessary regeneration.
-    const yotoResult = await createOrUpdateTTSPlaylist({
-      title,
-      chapters,
-      accessToken,
-      cardId: existingCardId,
-      coverImageUrl,
-    });
+    let yotoResult;
+    try {
+      yotoResult = await createOrUpdateTTSPlaylist({
+        title,
+        chapters,
+        accessToken,
+        cardId: existingCardId,
+        coverImageUrl,
+      });
+    } catch (error) {
+      // Out of ElevenLabs credits is expected, not a failure: skip softly and retry on a later run.
+      // The data hash is not stored here, so the next run will try again.
+      if (error?.code === 'elevenlabs_quota_exceeded') {
+        console.warn('[Webhook] ElevenLabs quota exceeded — skipping TTS update');
+        return Response.json({
+          success: true,
+          skipped: true,
+          reason: 'ElevenLabs quota exceeded. The playlist was not updated; it will retry on a later run.',
+          dataSource: {
+            url: workerUrl,
+            lastUpdated: workerData.lastUpdated,
+            dataHash: newDataHash ?? null,
+          },
+          timestamp: new Date().toISOString(),
+        });
+      }
+      throw error;
+    }
+
+    // Record the successful regeneration so the weekly limit applies to the next run
+    storeTtsUpdatedAt(Date.now());
 
     if (yotoResult.cardId) {
       storeCardId(yotoResult.cardId);
