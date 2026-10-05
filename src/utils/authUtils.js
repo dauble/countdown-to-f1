@@ -128,6 +128,22 @@ export function storeDataHash(hash) {
 }
 
 /**
+ * Get the epoch ms of the last successful TTS playlist update (or null if never).
+ * Used to limit ElevenLabs regeneration to once per interval.
+ */
+export function getStoredTtsUpdatedAt() {
+  return config.get("f1TtsUpdatedAt") ?? null;
+}
+
+/**
+ * Record when TTS audio was last successfully regenerated.
+ * @param {number} epochMs - Date.now() value
+ */
+export function storeTtsUpdatedAt(epochMs) {
+  config.set("f1TtsUpdatedAt", epochMs);
+}
+
+/**
  * Refresh the access token using the stored refresh token
  * @returns {Promise<string|null>} New access token, or null if refresh failed
  */

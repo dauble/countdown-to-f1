@@ -238,7 +238,12 @@ async function generateElevenLabsAudio(text, voiceId = DEFAULT_VOICE_ID, modelId
 
   if (!response.ok) {
     const errorText = await response.text();
-    throw new YotoApiError(`ElevenLabs TTS generation failed: ${errorText}`, response.status);
+    const error = new YotoApiError(`ElevenLabs TTS generation failed: ${errorText}`, response.status);
+    // Lets callers treat an out-of-credits ElevenLabs account as a soft, expected skip
+    if (errorText.includes('quota_exceeded')) {
+      error.code = 'elevenlabs_quota_exceeded';
+    }
+    throw error;
   }
 
   return Buffer.from(await response.arrayBuffer());

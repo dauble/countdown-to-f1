@@ -41,6 +41,9 @@ jobs:
             echo "✅ Playlist refresh successful!"
             echo "$body" | jq -r '.race | "Race: \(.name) in \(.location), \(.country)"' || true
             echo "$body" | jq -r '.yoto | "Job ID: \(.jobId), Status: \(.status)"' || true
+            if [ "$(echo "$body" | jq -r '.skipped // false')" = "true" ]; then
+              echo "::warning::Playlist refresh skipped: $(echo "$body" | jq -r '.reason')"
+            fi
           elif [ "$http_code" -ge 500 ]; then
             echo "❌ Playlist refresh failed with server error (HTTP $http_code)"
             echo "$body"

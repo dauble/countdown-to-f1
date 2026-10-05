@@ -5,6 +5,24 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.5.0] - 2026-10-05
+
+### Added
+
+- **Weekly limit on TTS regeneration.** The automated refresh regenerates ElevenLabs audio at most
+  once every 7 days, even when the F1 data changes more often. Runs inside that window skip the
+  ElevenLabs calls entirely. The timestamp of the last successful regeneration is stored alongside
+  the data hash in the app's config file (`/data` on Fly). Manual `workflow_dispatch` runs are subject
+  to the same limit. Playlist content can lag by up to a week after F1 data changes.
+
+### Changed
+
+- **ElevenLabs quota errors are a soft skip.** When ElevenLabs returns `quota_exceeded` (out of
+  credits), the webhook responds with HTTP 200 and `skipped: true` plus a reason, instead of a 500.
+  The data hash is not stored on that path, so the next scheduled run retries.
+- **Skipped refreshes show as warnings.** The `Refresh F1 Yoto Playlist` workflow emits a
+  `::warning::` annotation with the skip reason, and the job stays green.
+
 ## [1.4.2] - 2026-09-21
 
 ### Fixed
