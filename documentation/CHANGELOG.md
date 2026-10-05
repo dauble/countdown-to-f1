@@ -5,6 +5,22 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.5.3] - 2026-10-05
+
+### Security
+
+- **Upgraded `next` from 16.3.4 to 16.3.8** to fix a critical remote code execution vulnerability in
+  `next/og` `ImageResponse` (GHSA-vcvr-r3jv-pc5j, affects 16.2.0 through 16.3.5). This is a patch
+  release within the same minor line, so it is non-breaking. The pin is now exact.
+- **Updated transitive `brace-expansion`** to a patched version via `npm audit fix` (non-breaking).
+
+### Known issues
+
+- Five high-severity advisories remain in the `eslint-config-next` dependency chain (`braces`,
+  `fast-glob`, `micromatch`, `@next/eslint-plugin-next`, `eslint-config-next`). The only available fix
+  downgrades `eslint-config-next` to 14.2.35, which is a breaking change for this Next 16 app. These
+  packages are dev-only linting dependencies and are not part of the runtime app or worker.
+
 ## [1.5.2] - 2026-10-05
 
 ### Changed
